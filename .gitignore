@@ -1,0 +1,11 @@
+# Local Claude Code settings (machine-specific)
+.claude/
+
+# Build outputs
+/build/
+/target/
+bench/results/
+
+# OS / editor cruft
+.DS_Store
+*.swp
