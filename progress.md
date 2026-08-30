@@ -51,6 +51,9 @@ The Python numeric baseline and initial C11 build scaffold are implemented. Phas
 
 ## Documentation completed
 
+- 2026-08-30: pinned ephemeral PostgreSQL 15.14 and Redis 7.4.11 shared test
+  services with loopback-only ports, health checks, resource bounds, and CI. Both
+  containers passed real `SELECT 1`/`PING`; no unverified schema was created.
 - 2026-08-30: added hard-failing CI jobs for the pinned Python golden, dev/bench
   C builds and tests, compiler-flag verification, formatting, and clang-tidy.
   Local workflow parsing plus all 17 Python/C checks pass; hosted status awaits push.
@@ -71,5 +74,5 @@ The Python numeric baseline and initial C11 build scaffold are implemented. Phas
 
 ## Next action
 
-Add shared PostgreSQL 15/Redis 7 health fixtures and the Phase 0 single-
-libwebsockets-loop feasibility spike. Keep schema-specific DB work blocked.
+Implement the Phase 0 single-libwebsockets-loop feasibility spike for nonblocking
+libpq, hiredis async, and libcurl multi, including required failure/recovery cases.
