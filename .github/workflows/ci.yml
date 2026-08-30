@@ -71,3 +71,20 @@ jobs:
           core/src/alpha.c core/tests/test_scaffold.c
           --warnings-as-errors=*
           --header-filter='core/(include|src|tests)/.*'
+
+  shared-services:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11.15"
+      - name: Validate Compose model
+        run: docker compose config --quiet
+      - name: Start pinned shared services
+        run: docker compose up -d --wait
+      - name: Verify PostgreSQL and Redis readiness
+        run: python tools/verify_services.py
+      - name: Stop shared services
+        if: always()
+        run: docker compose down --volumes
