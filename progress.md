@@ -11,8 +11,11 @@ up at **Phase 0**, pins the Python reference, and records a baseline before port
 
 - Python commit SHA: `3642cdc0e4026424ca9b6158125551eee1d42683`
 - Python worktree: tracked files clean; untracked `HANDOFF-2026-08-03.md` present
-- Dependency manifest: `requirements.txt`, SHA-256 `bb923cd220358a0d3fd6d2a5889a60a30a49e476f4bd499cd52de21b13fe0837`; no exact lock
-- Schema/fixture version: unresolved; blocks golden generation and public results
+- Global dependency manifest: `requirements.txt`, SHA-256 `bb923cd220358a0d3fd6d2a5889a60a30a49e476f4bd499cd52de21b13fe0837`; no exact lock
+- Numeric workload lock: CPython 3.11.15, standard-library-only imported path,
+  source-file checksums in `bench/baseline/python-backtest-lock.json`
+- Fixture: `backtest-small-v1`, 1,000 bars, SHA-256 `594b6175ce32fd33576c3a38cd4ac8231a0dd2316cd2483672a5d1dc434331f1`
+- Schema version: unresolved; blocks schema-dependent fixtures and results
 - Benchmark host/toolchain: macOS 26.5.1 arm64, Apple M5 Pro (15 logical CPUs,
   48 GB), Python 3.14.6, Apple clang 21.0.0, CMake 4.4.3
 - Machine-readable record: `bench/baseline/python-reference.json`
@@ -48,6 +51,9 @@ up at **Phase 0**, pins the Python reference, and records a baseline before port
 
 ## Documentation completed
 
+- 2026-08-30: generated the deterministic `backtest-small-v1` fixture and pinned
+  Python golden; recorded an eligible 10-trial Python baseline (median 2.3716 ms,
+  p95 2.3805 ms per 1,000-bar run). This is baseline evidence, not a speed claim.
 - 2026-08-30: pinned the Python source revision, dependency-manifest checksum,
   dirty state, and benchmark host; unresolved lock/schema/fixtures remain explicit blockers.
 - 2026-08-30: reframed the handoff as a benchmark-driven Python/C/selected-Rust
@@ -59,5 +65,5 @@ up at **Phase 0**, pins the Python reference, and records a baseline before port
 
 ## Next action
 
-Freeze the resolved Python dependencies and identify the schema/fixture versions,
-then generate the first golden and measured Python baseline before C claims.
+Create the CMake/C test scaffold and run both `dev` and `bench` presets. Keep DB
+integration blocked until a canonical schema/migration source is identified.

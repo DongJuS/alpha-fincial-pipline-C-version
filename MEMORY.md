@@ -29,6 +29,10 @@
   tests pin endpoint URL, path-style addressing, multipart behavior, and checksums.
 
 ## Behavior fidelity
+- `backtest-small-v1` is the canonical numeric anchor: 1,000 deterministic weekday
+  bars, 20 replayed round trips, CPython 3.11.15, and no external package imports.
+  Its fixture/source/golden checksums are pinned under `bench/`; DB schema remains
+  unresolved and must not be inferred from this schema-free workload.
 - A benchmark is eligible only after its parity case passes against goldens made
   from the Python SHA recorded in `progress.md`. See `docs/BENCHMARK_PLAN.md`.
 - Idiomatic re-architecture, but **numeric behavior must match the Python source**
