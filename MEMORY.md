@@ -6,6 +6,17 @@
 - **This is a comparison project, not an automatic Python replacement.** The
   operating Python implementation remains the pinned behavioral/performance
   baseline until evidence supports a later migration decision.
+- **Target end-state = measured, parity-gated HYBRID with replay-shadow evidence
+  for a separately approved cutover** (`docs/plans/MVP_ROADMAP.md`, discussion
+  `20260830-mvp-strategy-discussion.md`): C decision core + Rust
+  async/order/datalake edges + Python
+  retained where porting isn't worth it. Chosen over pure-Python (perf/cost),
+  pure pro-C (edge safety/maintenance), and Rust-everywhere (FFI/toolchain tax on
+  the core). Delivered as 5 vertical MVPs; **MVP-2 (driver I/O) is the go/no-go** —
+  if C/Rust drivers do not show a statistically repeatable primary-metric win,
+  ship the C numeric core as a library and keep Python for I/O. The gate requires
+  at least 30 order-rotated trials and a 95% bootstrap CI excluding parity, with
+  no correctness, error, drop, resource, or safety regression.
 - **C owns normalization and deterministic decisions.** Pure-C networking uses
   libwebsockets as the sole event-loop owner. Rust owns the selected S3/Parquet
   datalake and is optional for network-edge comparisons, behind C-owned contracts.
@@ -49,6 +60,8 @@
 - Risk/blend config is a checksummed input fixture, not an assumed default.
 
 ## Safety invariants
+- MVP-4 validation is an order-disabled deterministic replay shadow. Live shadow
+  access, production deployment, and real-order activation require separate approval.
 - Order authority isolated to the broker edge module.
 - Risk gates are enforced below the signal layer. Defaults match Python; only
   validated portfolio config may change them, never a signal/strategy payload.
