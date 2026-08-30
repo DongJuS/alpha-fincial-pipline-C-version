@@ -1,0 +1,33 @@
+{
+  "format_version": 1,
+  "workload": "backtest-small",
+  "python": {
+    "implementation": "CPython",
+    "version": "3.11.15",
+    "source_runtime_contract": "python:3.11-slim"
+  },
+  "dependencies": {
+    "external_packages": [],
+    "scope": "Imported backtest path uses the Python standard library only"
+  },
+  "source": {
+    "commit": "3642cdc0e4026424ca9b6158125551eee1d42683",
+    "files_sha256": {
+      "src/constants.py": "ed93e76471c95d526ce4db0cbbc7cf2a5c796aad48b1d836d72d3504c7d7d613",
+      "src/backtest/models.py": "cceb28073ac37db67463713059c119f7f9c64758ff5aff7cd3c484ce3534009a",
+      "src/backtest/cost_model.py": "de3c88881cf6e9398f00a496d0d930f7e00195a8d7130a776f7eeac275168929",
+      "src/backtest/engine.py": "0ae8baf0a72bc5937974ec7883cf45e925d75afbd38a784a259b6c8e8dcbf8e8",
+      "src/backtest/metrics.py": "e4d43f7618e0a3ca4bd5096b46d646d297517121cad551298b90ca8b60fb9531",
+      "src/backtest/signal_source.py": "273a5adb6f89d7c4ee58ae2a02d474a62f168761bdc9c5ab3c1c668dfa074781"
+    }
+  },
+  "fixture": {
+    "version": "backtest-small-v1",
+    "sha256": "594b6175ce32fd33576c3a38cd4ac8231a0dd2316cd2483672a5d1dc434331f1"
+  },
+  "schema": {
+    "required": false,
+    "global_schema_status": "unresolved",
+    "source_catalog_sha256": "12898596331cfd7401ac4793e4c9891f3761efce6cfe9af5c56b2e947f6bb593"
+  }
+}
