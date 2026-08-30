@@ -97,7 +97,12 @@ jobs:
       - name: Install single-loop spike dependencies
         run: >-
           sudo apt-get update && sudo apt-get install -y
-          libwebsockets-dev libpq-dev libhiredis-dev libcurl4-openssl-dev pkg-config
+          libwebsockets-dev libpq-dev postgresql-client libhiredis-dev
+          libcurl4-openssl-dev pkg-config
+      - name: Apply pinned Python schema twice
+        env:
+          ALPHA_RUN_SCHEMA_APPLY: "1"
+        run: python -m unittest tests.test_schema_apply -v
       - name: Build and verify single-loop failure/recovery evidence
         env:
           ALPHA_RUN_EVENT_LOOP_SPIKE: "1"

@@ -53,6 +53,10 @@
   deployed migration job, and its two in-scope migrations. The schema lock binds
   those bytes to the Python commit; never invent a numeric migration version.
   Applying them cleanly remains a separate gate.
+- The locked Python schema bootstrap is applied by AST-extracting the literal
+  `CREATE_TABLES` list and piping those exact bytes to `psql`; never import the
+  Python app or reconstruct DDL from docs. The idempotency gate applies it twice.
+  Date partitions are created only when a versioned fixture needs them.
 - `backtest-small-v1` is the canonical numeric anchor: 1,000 deterministic weekday
   bars, 20 replayed round trips, CPython 3.11.15, and no external package imports.
   Its fixture/source/golden checksums are pinned under `bench/`; DB schema remains

@@ -4,8 +4,8 @@
 
 ## Status: Phase 0 in progress — single-loop feasibility proven
 
-The Python numeric baseline and initial C11 build scaffold are implemented. Phase
-0 continues with the unresolved schema/migration pin and hosted CI confirmation.
+The Python baseline, C11 scaffold, shared services, schema bootstrap gate, and
+single-loop spike are implemented. Phase 0 awaits hosted CI confirmation.
 
 ## Reference baseline (must be completed in P0)
 
@@ -66,6 +66,10 @@ live shadowing or order activation is not authorized by this project.
 
 ## Documentation completed
 
+- 2026-08-30: proved the locked Python `CREATE_TABLES` bootstrap applies twice to
+  an empty PostgreSQL 15 service. The gate parses literal SQL from the pinned
+  source instead of copying or importing application code, verifies seven
+  in-scope tables, and leaves date partitions to versioned fixture tasks.
 - 2026-08-30: replaced the nonexistent schema revision with a reproducible,
   content-addressed bootstrap identity. A hard-failing validator locks the Python
   SHA, complete `init_db.py`, deployment migration job, and its two in-scope
@@ -90,7 +94,8 @@ live shadowing or order activation is not authorized by this project.
   Python golden; recorded an eligible 10-trial Python baseline (median 2.3716 ms,
   p95 2.3805 ms per 1,000-bar run). This is baseline evidence, not a speed claim.
 - 2026-08-30: pinned the Python source revision, dependency-manifest checksum,
-  dirty state, and benchmark host; unresolved lock/schema/fixtures remain explicit blockers.
+  dirty state, and benchmark host. The global range manifest remains unsuitable
+  as an exact environment; each eligible workload must carry its own lock.
 - 2026-08-30: reframed the handoff as a benchmark-driven Python/C/selected-Rust
   comparison; added the normative benchmark protocol and aligned P0–P5 exits.
 - 2026-08-30: locked the selected C/Rust libraries and retained the Python
