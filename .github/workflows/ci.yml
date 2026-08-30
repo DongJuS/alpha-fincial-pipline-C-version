@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_REFERENCE_SHA: 3642cdc0e4026424ca9b6158125551eee1d42683
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  python-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11.15"
+      - name: Check out pinned Python reference
+        run: |
+          git clone --no-checkout https://github.com/DongJuS/alpha-financial-pipeline.git ../alpha-financial-pipeline
+          git -C ../alpha-financial-pipeline checkout --detach "$PYTHON_REFERENCE_SHA"
+      - name: Verify fixtures, source hashes, and Python golden
+        run: python -m unittest discover -s tests -v
+
+  c-build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [dev, bench]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11.15"
+      - name: Configure
+        run: cmake --preset "${{ matrix.preset }}"
+      - name: Build
+        run: cmake --build --preset "${{ matrix.preset }}" --parallel
+      - name: Test exact artifact
+        run: ctest --preset "${{ matrix.preset }}"
+      - name: Verify compiler flags
+        run: |
+          if [ "${{ matrix.preset }}" = dev ]; then
+            python tools/verify_build_flags.py dev build/compile_commands.json
+          else
+            python tools/verify_build_flags.py bench build/bench/compile_commands.json
+          fi
+
+  c-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install LLVM quality tools
+        run: sudo apt-get update && sudo apt-get install -y clang-format clang-tidy
+      - name: Configure compile database
+        run: cmake --preset dev
+      - name: Check formatting
+        run: >-
+          clang-format --dry-run --Werror
+          core/src/alpha.c core/tests/test_scaffold.c
+          core/include/alpha/alpha.h core/include/alpha/constants.h
+          core/include/alpha/domain.h core/include/alpha/errors.h
+      - name: Run clang-tidy
+        run: >-
+          clang-tidy -p build
+          core/src/alpha.c core/tests/test_scaffold.c
+          --warnings-as-errors=*
+          --header-filter='core/(include|src|tests)/.*'
