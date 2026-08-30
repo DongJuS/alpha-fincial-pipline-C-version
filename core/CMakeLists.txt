@@ -11,6 +11,9 @@ target_include_directories(
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 target_link_libraries(alpha_core PUBLIC yyjson)
+if(UNIX)
+    target_link_libraries(alpha_core PUBLIC m)
+endif()
 target_compile_options(alpha_core PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
 set_target_properties(alpha_core PROPERTIES OUTPUT_NAME alpha_core POSITION_INDEPENDENT_CODE ON)
 

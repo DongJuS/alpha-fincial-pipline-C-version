@@ -27,6 +27,7 @@ class CiWorkflowTest(unittest.TestCase):
         self.assertNotIn("continue-on-error", self.workflow)
 
     def test_shared_services_run_schema_and_event_loop_gates(self) -> None:
+        self.assertEqual(2, self.workflow.count("Check out pinned Python reference"))
         self.assertIn('ALPHA_RUN_SCHEMA_APPLY: "1"', self.workflow)
         self.assertIn("tests.test_schema_apply", self.workflow)
         self.assertIn('ALPHA_RUN_EVENT_LOOP_SPIKE: "1"', self.workflow)
