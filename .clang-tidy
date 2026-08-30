@@ -1,0 +1,9 @@
+Checks: >
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -readability-magic-numbers
+WarningsAsErrors: '*'
+HeaderFilterRegex: 'core/(include|src)/.*'

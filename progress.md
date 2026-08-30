@@ -4,8 +4,8 @@
 
 ## Status: Phase 0 in progress — Python source revision pinned
 
-The specification set is written. No source code exists yet. A developer/AI picks
-up at **Phase 0**, pins the Python reference, and records a baseline before porting.
+The Python numeric baseline and initial C11 build scaffold are implemented. Phase
+0 continues with CI, shared-service setup, and the single-event-loop feasibility spike.
 
 ## Reference baseline (must be completed in P0)
 
@@ -24,7 +24,7 @@ up at **Phase 0**, pins the Python reference, and records a baseline before port
 
 | Phase | Description | State |
 |-------|-------------|-------|
-| P0 | Pin Python baseline + harness + C scaffold | 🟨 in progress (source pin captured) |
+| P0 | Pin Python baseline + harness + C scaffold | 🟨 in progress (baseline + C scaffold) |
 | P1 | C numeric slice + first Python/C benchmark | ⬜ not started |
 | P2 | C decision core + parity/performance | ⬜ not started |
 | P3 | C drivers against shared infrastructure | ⬜ not started |
@@ -51,6 +51,9 @@ up at **Phase 0**, pins the Python reference, and records a baseline before port
 
 ## Documentation completed
 
+- 2026-08-30: added C11 `libalpha_core`, public domain/error/constants headers,
+  pinned yyjson 0.10.0 and Unity 2.6.1, and JSON/ABI/FP smoke tests. Both sanitizer
+  `dev` and optimized `bench` presets build and pass; bench forbids fast-math.
 - 2026-08-30: generated the deterministic `backtest-small-v1` fixture and pinned
   Python golden; recorded an eligible 10-trial Python baseline (median 2.3716 ms,
   p95 2.3805 ms per 1,000-bar run). This is baseline evidence, not a speed claim.
@@ -65,5 +68,5 @@ up at **Phase 0**, pins the Python reference, and records a baseline before port
 
 ## Next action
 
-Create the CMake/C test scaffold and run both `dev` and `bench` presets. Keep DB
-integration blocked until a canonical schema/migration source is identified.
+Add CI gates and the Phase 0 single-libwebsockets-loop feasibility spike. Keep DB
+schema fixture work blocked until a canonical migration source is identified.
