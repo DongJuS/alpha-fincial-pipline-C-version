@@ -30,7 +30,7 @@ golden parity against the pinned Python source under both the `dev` (ASan) and
 |-------|-------------|-------|
 | P0 | Pin Python baseline + harness + C scaffold | ✅ done (hosted CI green) |
 | P1 | C numeric slice + first Python/C benchmark | ✅ done (parity dev+bench, ~179× bench) |
-| P2 | C decision core + parity/performance | 🟨 in progress (market_data + blending done) |
+| P2 | C decision core + parity/performance | 🟨 nearly done (decisions+risk done; indicators left) |
 | P3 | C drivers against shared infrastructure | ⬜ not started |
 | P4 | Pure-C edges + Rust datalake + optional Rust network comparisons | ⬜ not started |
 | P5 | E2E + consolidated comparison report | ⬜ not started |
@@ -68,6 +68,17 @@ live shadowing or order activation is not authorized by this project.
 
 ## Documentation completed
 
+- 2026-08-31: **P2 part 2 — risk gates + max-position sizing.** Ported the
+  safety-critical decision gates as pure, no-I/O functions (`core/src/risk/gates.c`,
+  `core/src/portfolio/sizing.c`, header `risk.h`): L1 per-position stop/take, L2
+  portfolio-drawdown weakest-two (stable two-pointer = Python stable sort +
+  `candidates[:2]`), L3 daily-loss breaker decision, and the paper/real
+  max-position BUY gate. Golden parity (`test_risk`) against a Python transcription
+  of the pinned `portfolio_manager` arithmetic (the live methods are async/DB-
+  coupled — see MEMORY) under dev+bench, with take/stop/dd/daily boundaries, tie
+  selection, and paper/real denominators. Risk config is a checksummed fixture;
+  the test asserts it equals the Python-compatible defaults. Remaining P2:
+  indicators/ranking/screener (non-RL deterministic filters).
 - 2026-08-31: **P2 part 1 — market_data + blending.** Ported instrument-id maps,
   `sanitize_change_pct`/`compute_change_pct` (`core/src/market_data`) and the
   N-way + 2-way blending (`core/src/portfolio/blending.c`). New golden generator
