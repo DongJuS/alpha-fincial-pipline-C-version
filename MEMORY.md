@@ -21,6 +21,9 @@
   WS frames may be used only for an optional edge benchmark.
 
 ## External dependencies
+- Phase 0 vendors yyjson 0.10.0 and the permitted Unity 2.6.1 test framework so
+  dev/bench builds do not depend on unpinned host packages. Upstream commit IDs
+  and licenses are recorded in `third_party/README.md`.
 - C: yyjson; nonblocking libpq with bounded pipeline mode; hiredis integrated into
   the libwebsockets-owned loop; libcurl for required outbound HTTP.
 - Rust: Tokio, axum+tower, tokio-tungstenite, SQLx, fred. Datalake uses
