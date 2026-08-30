@@ -1,0 +1,17 @@
+{
+  "schema_identity": "bootstrap-sha256:c8b12a9e68b23571b52cb9a5d225d989e331536eee6b955da2d4c0e6d383a4d0",
+  "identity_kind": "content-addressed-bootstrap-bundle",
+  "python_commit": "3642cdc0e4026424ca9b6158125551eee1d42683",
+  "version_table": null,
+  "sources": [
+    {"path": "k8s/base/migration-job.yaml", "sha256": "055163d4a8b94739b359118e10670e5f400755cd8d0d68b1b06c1a9b3787a86e"},
+    {"path": "scripts/db/init_db.py", "sha256": "bbdd096a10ac367e899192a3f69b4e73b244e9f8255309d8b4c6f2b5621c757d"},
+    {"path": "scripts/db/migrate_ohlcv_minute.py", "sha256": "0421119d249bd1a202882d92be858f799133d8fb6281934cc800300329489b5e"},
+    {"path": "scripts/db/migrate_to_v2_instruments.py", "sha256": "7e84bc4b37ccf525569ee9135e32ecd76219ceb7679e2439ae547efe87c2382a"}
+  ],
+  "notes": [
+    "The pinned Python repository has no Alembic-style revision or schema version table.",
+    "init_db.py is the full idempotent bootstrap; the deployment job names the two in-scope incremental migrations locked here.",
+    "This identity pins source bytes only; applying the schema to a clean database is a separate gate."
+  ]
+}

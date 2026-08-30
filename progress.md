@@ -15,7 +15,9 @@ The Python numeric baseline and initial C11 build scaffold are implemented. Phas
 - Numeric workload lock: CPython 3.11.15, standard-library-only imported path,
   source-file checksums in `bench/baseline/python-backtest-lock.json`
 - Fixture: `backtest-small-v1`, 1,000 bars, SHA-256 `594b6175ce32fd33576c3a38cd4ac8231a0dd2316cd2483672a5d1dc434331f1`
-- Schema version: unresolved; blocks schema-dependent fixtures and results
+- Schema identity: `bootstrap-sha256:c8b12a9e…383a4d0`; the Python source has no
+  version table, so `python-schema-lock.json` pins the full bootstrap plus the two
+  in-scope migrations named by its deployment job by path and SHA-256
 - Benchmark host/toolchain: macOS 26.5.1 arm64, Apple M5 Pro (15 logical CPUs,
   48 GB), Python 3.14.6, Apple clang 21.0.0, CMake 4.4.3
 - Machine-readable record: `bench/baseline/python-reference.json`
@@ -24,7 +26,7 @@ The Python numeric baseline and initial C11 build scaffold are implemented. Phas
 
 | Phase | Description | State |
 |-------|-------------|-------|
-| P0 | Pin Python baseline + harness + C scaffold | 🟨 in progress (schema/hosted CI remain) |
+| P0 | Pin Python baseline + harness + C scaffold | 🟨 in progress (hosted CI remains) |
 | P1 | C numeric slice + first Python/C benchmark | ⬜ not started |
 | P2 | C decision core + parity/performance | ⬜ not started |
 | P3 | C drivers against shared infrastructure | ⬜ not started |
@@ -64,6 +66,10 @@ live shadowing or order activation is not authorized by this project.
 
 ## Documentation completed
 
+- 2026-08-30: replaced the nonexistent schema revision with a reproducible,
+  content-addressed bootstrap identity. A hard-failing validator locks the Python
+  SHA, complete `init_db.py`, deployment migration job, and its two in-scope
+  migrations. No migration number or schema behavior was invented.
 - 2026-08-30: proved the P0 single-libwebsockets service-loop design with
   nonblocking libpq, hiredis async, and curl multi against pinned shared services.
   Machine-checked evidence covers PG pipeline abort/sync/reuse, Redis
@@ -96,5 +102,5 @@ live shadowing or order activation is not authorized by this project.
 
 ## Next action
 
-Resolve and pin the Python schema/migration version without inventing a schema,
-then obtain hosted CI evidence to close Phase 0 before starting Phase 1.
+Restore origin connectivity, push `main`, and require hosted CI green to close
+Phase 0 before starting Phase 1.

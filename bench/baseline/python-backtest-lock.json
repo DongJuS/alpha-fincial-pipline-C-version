@@ -27,7 +27,8 @@
   },
   "schema": {
     "required": false,
-    "global_schema_status": "unresolved",
+    "global_schema_status": "content-addressed",
+    "global_schema_identity": "bootstrap-sha256:c8b12a9e68b23571b52cb9a5d225d989e331536eee6b955da2d4c0e6d383a4d0",
     "source_catalog_sha256": "12898596331cfd7401ac4793e4c9891f3761efce6cfe9af5c56b2e947f6bb593"
   }
 }

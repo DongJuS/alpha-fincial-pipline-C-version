@@ -48,6 +48,11 @@
   tests pin endpoint URL, path-style addressing, multipart behavior, and checksums.
 
 ## Behavior fidelity
+- The pinned Python source has no migration framework revision/version table.
+  Its schema identity is the SHA-256 of a sorted source bundle: `init_db.py`, the
+  deployed migration job, and its two in-scope migrations. The schema lock binds
+  those bytes to the Python commit; never invent a numeric migration version.
+  Applying them cleanly remains a separate gate.
 - `backtest-small-v1` is the canonical numeric anchor: 1,000 deterministic weekday
   bars, 20 replayed round trips, CPython 3.11.15, and no external package imports.
   Its fixture/source/golden checksums are pinned under `bench/`; DB schema remains
