@@ -65,12 +65,21 @@ jobs:
           core/src/alpha.c core/tests/test_scaffold.c
           core/include/alpha/alpha.h core/include/alpha/constants.h
           core/include/alpha/domain.h core/include/alpha/errors.h
+          spike/event_loop/main.c
       - name: Run clang-tidy
         run: >-
           clang-tidy -p build
           core/src/alpha.c core/tests/test_scaffold.c
           --warnings-as-errors=*
           --header-filter='core/(include|src|tests)/.*'
+      - name: Configure and lint event-loop spike
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebsockets-dev libpq-dev libhiredis-dev libcurl4-openssl-dev pkg-config
+          cmake -S spike/event_loop -B build/event-loop -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          clang-tidy -p build/event-loop spike/event_loop/main.c \
+            --checks='-*,clang-analyzer-*,bugprone-*,performance-*,portability-*,-bugprone-easily-swappable-parameters,-bugprone-signed-bitwise,-performance-no-int-to-ptr' \
+            --warnings-as-errors=*
 
   shared-services:
     runs-on: ubuntu-latest
@@ -85,6 +94,14 @@ jobs:
         run: docker compose up -d --wait
       - name: Verify PostgreSQL and Redis readiness
         run: python tools/verify_services.py
+      - name: Install single-loop spike dependencies
+        run: >-
+          sudo apt-get update && sudo apt-get install -y
+          libwebsockets-dev libpq-dev libhiredis-dev libcurl4-openssl-dev pkg-config
+      - name: Build and verify single-loop failure/recovery evidence
+        env:
+          ALPHA_RUN_EVENT_LOOP_SPIKE: "1"
+        run: python -m unittest tests.test_event_loop_spike -v
       - name: Stop shared services
         if: always()
         run: docker compose down --volumes

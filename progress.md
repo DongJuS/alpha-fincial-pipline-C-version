@@ -2,10 +2,10 @@
 
 > Update this after every task. Keep under ~200 lines. Record *why*, not just *what*.
 
-## Status: Phase 0 in progress — Python source revision pinned
+## Status: Phase 0 in progress — single-loop feasibility proven
 
 The Python numeric baseline and initial C11 build scaffold are implemented. Phase
-0 continues with CI, shared-service setup, and the single-event-loop feasibility spike.
+0 continues with the unresolved schema/migration pin and hosted CI confirmation.
 
 ## Reference baseline (must be completed in P0)
 
@@ -24,7 +24,7 @@ The Python numeric baseline and initial C11 build scaffold are implemented. Phas
 
 | Phase | Description | State |
 |-------|-------------|-------|
-| P0 | Pin Python baseline + harness + C scaffold | 🟨 in progress (baseline + C scaffold) |
+| P0 | Pin Python baseline + harness + C scaffold | 🟨 in progress (schema/hosted CI remain) |
 | P1 | C numeric slice + first Python/C benchmark | ⬜ not started |
 | P2 | C decision core + parity/performance | ⬜ not started |
 | P3 | C drivers against shared infrastructure | ⬜ not started |
@@ -64,6 +64,13 @@ live shadowing or order activation is not authorized by this project.
 
 ## Documentation completed
 
+- 2026-08-30: proved the P0 single-libwebsockets service-loop design with
+  nonblocking libpq, hiredis async, and curl multi against pinned shared services.
+  Machine-checked evidence covers PG pipeline abort/sync/reuse, Redis
+  disconnect/reconnect, HTTP, bounded backpressure, cancellation, request IDs,
+  one service thread, zero workers, clean shutdown, and no linked libuv/libevent.
+  The conservative 1 ms readiness probe is feasibility evidence only, not a
+  throughput result or Phase 3 production-driver design.
 - 2026-08-30: pinned ephemeral PostgreSQL 15.14 and Redis 7.4.11 shared test
   services with loopback-only ports, health checks, resource bounds, and CI. Both
   containers passed real `SELECT 1`/`PING`; no unverified schema was created.
@@ -89,5 +96,5 @@ live shadowing or order activation is not authorized by this project.
 
 ## Next action
 
-Implement the Phase 0 single-libwebsockets-loop feasibility spike for nonblocking
-libpq, hiredis async, and libcurl multi, including required failure/recovery cases.
+Resolve and pin the Python schema/migration version without inventing a schema,
+then obtain hosted CI evidence to close Phase 0 before starting Phase 1.
