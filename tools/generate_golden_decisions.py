@@ -124,13 +124,90 @@ def build_market(mod, fixture: dict) -> dict:
     }
 
 
+# ── risk gates ──────────────────────────────────────────────────────────────
+# The live portfolio_manager methods are async and DB-coupled, so they cannot be
+# invoked directly. The functions below transcribe the pure decision arithmetic
+# line-for-line from src/agents/portfolio_manager.py @ the pinned commit
+# (_check_rule_based_exits, _check_portfolio_drawdown, _is_daily_loss_blocked,
+# process_signal max-position gate). This transcription dependency is recorded in
+# MEMORY.md.
+
+
+def risk_l1(pos: dict, cfg: dict) -> str:
+    if pos["quantity"] <= 0:
+        return "NONE"
+    avg = pos["avg_fill_price"]
+    cur = pos["current_price"]
+    if avg <= 0 or cur <= 0:
+        return "NONE"
+    pnl = (cur - avg) / avg * 100.0
+    if pnl >= cfg["take_profit_pct"]:
+        return "TAKE_PROFIT"
+    if pnl <= -cfg["individual_stop_loss_pct"]:
+        return "STOP_LOSS"
+    return "NONE"
+
+
+def risk_l2(case: dict, cfg: dict) -> dict:
+    ce = case["current_equity"]
+    be = case["baseline_equity"]
+    if ce <= 0 or be <= 0:
+        return {"dd_pct": None, "selected": []}
+    dd = (ce - be) / be * 100.0
+    if dd > -cfg["portfolio_drawdown_limit_pct"]:
+        return {"dd_pct": dd, "selected": []}
+    candidates: list[tuple[float, int]] = []
+    for i, pos in enumerate(case["positions"]):
+        if pos["quantity"] <= 0:
+            continue
+        avg = pos["avg_fill_price"]
+        cur = pos["current_price"]
+        if avg <= 0 or cur <= 0:
+            continue
+        candidates.append(((cur - avg) / avg * 100.0, i))
+    candidates.sort(key=lambda item: item[0])  # stable, ascending pnl
+    return {"dd_pct": dd, "selected": [i for _, i in candidates[:2]]}
+
+
+def risk_max_position(case: dict, cfg: dict) -> dict:
+    if case["is_paper"]:
+        denom = max(case["total_value"], case["paper_seed_capital"], 1)
+    else:
+        denom = max(case["total_value"] + case["intended_buy_value"], 1)
+    next_value = case["existing_position_value"] + case["intended_buy_value"]
+    next_weight_pct = next_value / denom * 100.0
+    return {
+        "allowed": not (next_weight_pct > cfg["max_position_pct"]),
+        "next_weight_pct": next_weight_pct,
+    }
+
+
+def build_risk(fixture: dict) -> dict:
+    cfg = fixture["config"]
+    return {
+        "l1": [{"name": c["name"], "kind": risk_l1(c, cfg)} for c in fixture["l1"]],
+        "l2": [{"name": c["name"], **risk_l2(c, cfg)} for c in fixture["l2"]],
+        "l3": [
+            {"name": c["name"], "blocked": c["daily_realized_pnl_pct"] <= -cfg["daily_loss_limit_pct"]}
+            for c in fixture["l3"]
+        ],
+        "max_position": [
+            {"name": c["name"], **risk_max_position(c, cfg)} for c in fixture["max_position"]
+        ],
+    }
+
+
 def build_golden(source: Path, fixture_path: Path, case: str) -> dict:
     assert_pinned_source(source)
-    mod = load_modules(source)
     fixture_bytes = fixture_path.read_bytes()
     fixture = json.loads(fixture_bytes)
-    result = build_blend(mod, fixture) if case == "blend-cases" else build_market(mod, fixture)
-    return {
+    if case == "blend-cases":
+        result = build_blend(load_modules(source), fixture)
+    elif case == "market-data-cases":
+        result = build_market(load_modules(source), fixture)
+    else:
+        result = build_risk(fixture)
+    golden = {
         "format_version": 1,
         "case": case,
         "python_commit": PINNED_COMMIT,
@@ -138,6 +215,10 @@ def build_golden(source: Path, fixture_path: Path, case: str) -> dict:
         "input_sha256": sha256_bytes(fixture_bytes),
         "result": result,
     }
+    if case == "risk-cases":
+        golden["config_sha256"] = sha256_bytes(canonical_bytes(fixture["config"]))
+        golden["transcribed_from_python"] = True
+    return golden
 
 
 def main() -> int:
@@ -146,7 +227,7 @@ def main() -> int:
     parser.add_argument("--fixtures", type=Path, default=Path("bench/fixtures"))
     parser.add_argument("--output", type=Path, default=Path("core/tests/golden"))
     args = parser.parse_args()
-    for case in ("blend-cases", "market-data-cases"):
+    for case in ("blend-cases", "market-data-cases", "risk-cases"):
         golden = build_golden(args.source, args.fixtures / f"{case}.json", case)
         out = args.output / f"{case}.json"
         out.parent.mkdir(parents=True, exist_ok=True)

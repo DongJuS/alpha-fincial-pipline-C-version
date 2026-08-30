@@ -1,0 +1,51 @@
+{
+  "fixture_version": "risk-cases-v1",
+  "config": {
+    "max_position_pct": 20,
+    "daily_loss_limit_pct": 3,
+    "individual_stop_loss_pct": 7,
+    "take_profit_pct": 5,
+    "portfolio_drawdown_limit_pct": 8
+  },
+  "l1": [
+    {"name": "take_exactly_5", "quantity": 10, "avg_fill_price": 100.0, "current_price": 105.0},
+    {"name": "take_below_5", "quantity": 10, "avg_fill_price": 100.0, "current_price": 104.99},
+    {"name": "stop_exactly_7", "quantity": 10, "avg_fill_price": 100.0, "current_price": 93.0},
+    {"name": "stop_above_7", "quantity": 10, "avg_fill_price": 100.0, "current_price": 93.01},
+    {"name": "flat_hold", "quantity": 10, "avg_fill_price": 100.0, "current_price": 101.0},
+    {"name": "zero_qty", "quantity": 0, "avg_fill_price": 100.0, "current_price": 200.0},
+    {"name": "zero_price", "quantity": 10, "avg_fill_price": 0.0, "current_price": 100.0}
+  ],
+  "l2": [
+    {"name": "dd_exactly_8", "current_equity": 92.0, "baseline_equity": 100.0, "positions": [
+      {"ticker": "AAA", "quantity": 1, "avg_fill_price": 100.0, "current_price": 90.0},
+      {"ticker": "BBB", "quantity": 1, "avg_fill_price": 100.0, "current_price": 110.0},
+      {"ticker": "CCC", "quantity": 1, "avg_fill_price": 100.0, "current_price": 80.0}
+    ]},
+    {"name": "dd_not_breached", "current_equity": 92.01, "baseline_equity": 100.0, "positions": [
+      {"ticker": "AAA", "quantity": 1, "avg_fill_price": 100.0, "current_price": 90.0}
+    ]},
+    {"name": "dd_tie_weakest", "current_equity": 80.0, "baseline_equity": 100.0, "positions": [
+      {"ticker": "AAA", "quantity": 1, "avg_fill_price": 100.0, "current_price": 95.0},
+      {"ticker": "BBB", "quantity": 1, "avg_fill_price": 100.0, "current_price": 95.0},
+      {"ticker": "CCC", "quantity": 1, "avg_fill_price": 100.0, "current_price": 90.0}
+    ]},
+    {"name": "dd_skips_invalid", "current_equity": 80.0, "baseline_equity": 100.0, "positions": [
+      {"ticker": "AAA", "quantity": 0, "avg_fill_price": 100.0, "current_price": 90.0},
+      {"ticker": "BBB", "quantity": 1, "avg_fill_price": 100.0, "current_price": 88.0}
+    ]},
+    {"name": "equity_nonpositive", "current_equity": 0.0, "baseline_equity": 100.0, "positions": []}
+  ],
+  "l3": [
+    {"name": "block_exactly_3", "daily_realized_pnl_pct": -3.0},
+    {"name": "no_block_above", "daily_realized_pnl_pct": -2.99},
+    {"name": "block_deep", "daily_realized_pnl_pct": -5.0},
+    {"name": "profit_no_block", "daily_realized_pnl_pct": 1.5}
+  ],
+  "max_position": [
+    {"name": "paper_exactly_20", "is_paper": true, "total_value": 0.0, "paper_seed_capital": 10000000.0, "intended_buy_value": 2000000.0, "existing_position_value": 0.0},
+    {"name": "paper_over_20", "is_paper": true, "total_value": 0.0, "paper_seed_capital": 10000000.0, "intended_buy_value": 2000001.0, "existing_position_value": 0.0},
+    {"name": "real_exactly_20", "is_paper": false, "total_value": 8000000.0, "paper_seed_capital": 0.0, "intended_buy_value": 2000000.0, "existing_position_value": 0.0},
+    {"name": "real_over_20", "is_paper": false, "total_value": 8000000.0, "paper_seed_capital": 0.0, "intended_buy_value": 1200000.0, "existing_position_value": 1000000.0}
+  ]
+}

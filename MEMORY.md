@@ -87,6 +87,20 @@
   `bench/results/20260831/backtest-small-c.json`. This is a numeric-core result
   only; per §migration it does not by itself justify replacing Python.
 - Risk/blend config is a checksummed input fixture, not an assumed default.
+- **P2 decision layer parity (market_data, blending, risk gates, sizing) is done.**
+  Instrument-id/change_pct, N-way+2-way blend, L1 stop/take, L2 drawdown
+  weakest-two, L3 daily breaker, and the max-position gate match the pinned
+  Python under dev+bench. L2 weakest-two uses a stable two-pointer selection
+  (strict `<`) that reproduces Python's stable sort + `candidates[:2]` on ties.
+- **Risk-gate goldens are transcribed, not live-invoked.** The Python
+  `portfolio_manager` gate methods are async and Postgres-coupled, so
+  `tools/generate_golden_decisions.py` contains a Python reference that
+  transcribes their pure decision arithmetic line-for-line from the pinned
+  source (blend/market_data goldens still import the real Python modules). This is
+  an intentional, documented deviation from live-Python goldens; if the gate
+  arithmetic changes upstream, re-transcribe. Risk config is a checksummed
+  fixture; the golden records its SHA-256 and the C test asserts the fixture
+  equals the Python-compatible defaults.
 
 ## Toolchain / lint
 - Project `.clang-tidy` disables four checks project-wide with rationale:
