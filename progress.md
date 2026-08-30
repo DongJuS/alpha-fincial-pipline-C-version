@@ -49,6 +49,19 @@ The Python numeric baseline and initial C11 build scaffold are implemented. Phas
 - Numeric wins alone do not justify migration. Risk decisions stay single-source
   C, and production enables exactly one separately approved broker adapter.
 
+## MVP overlay (vertical slices over P0–P5)
+
+Target end-state = measured, parity-gated **hybrid with replay-shadow evidence for a separately approved cutover**
+that overcomes Python + comparison-only-C + pure-pro-C + Rust-everywhere. Ladder:
+MVP-0 rig → MVP-1 numeric win → **MVP-2 driver I/O (GO/NO-GO)** → MVP-3 vertical E2E
+beats Python → MVP-4 shadow hybrid + cutover. See `docs/plans/MVP_ROADMAP.md` and
+the debate in `docs/plans/20260830-mvp-strategy-discussion.md`.
+
+MVP-2 GO requires a statistically repeatable primary-metric win over at least 30
+order-rotated trials (95% bootstrap CI excludes parity) with no correctness,
+error, drop, resource, or safety regression. MVP-4 uses replay-shadow evidence;
+live shadowing or order activation is not authorized by this project.
+
 ## Documentation completed
 
 - 2026-08-30: pinned ephemeral PostgreSQL 15.14 and Redis 7.4.11 shared test
@@ -71,6 +84,8 @@ The Python numeric baseline and initial C11 build scaffold are implemented. Phas
   collector; removed direct C collector and C datalake as default targets.
 - 2026-08-30: hardened single-loop fallback, FP parity, KRX-calendar lockout,
   config fixtures, migration criteria, and broker authority rules.
+- 2026-08-30: added `bench` preset + parity-on-benchmarked-artifact rule; wrote the
+  3-persona MVP strategy discussion and `MVP_ROADMAP.md` (hybrid end-state).
 
 ## Next action
 
