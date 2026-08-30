@@ -7,7 +7,7 @@ typedef enum {
     ALPHA_ERR_RANGE,
     ALPHA_ERR_IO,
     ALPHA_ERR_DB,
-    ALPHA_ERR_HTTP
+    ALPHA_ERR_HTTP,
 } alpha_err_t;
 
 #endif
