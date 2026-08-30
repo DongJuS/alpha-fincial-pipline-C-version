@@ -71,7 +71,33 @@
   drawdown −8%. Verbatim in `docs/MODULE_SPECS.md`.
 - Standard parity/performance builds forbid `-ffast-math`, use
   `-ffp-contract=off` + `FE_TONEAREST`, and implement Python ties-to-even rounding.
+- **Python `round(x, n)` parity is reproduced with `snprintf("%.*f")` + `strtod`**
+  under verified `FE_TONEAREST` (`core/src/domain/round.c`), not C `round()`.
+  In default rounding mode both do correctly-rounded ties-to-even decimal
+  conversion, so C matches CPython; the `backtest-small` golden confirms all
+  4dp/1dp metrics bit-for-bit within 1e-9.
+- **Dates are proleptic-Gregorian epoch-day integers** (Hinnant days-from-civil,
+  `core/src/domain/date.h/.c`); differences reproduce Python `(d2-d1).days` for
+  FIFO holding-day metrics. Only diffs/equality are relied on, so the epoch choice
+  is irrelevant to parity.
+- **P1 numeric core is done and parity-gated.** cost_model/metrics/engine +
+  ReplaySignalSource match the Python golden under **both** `dev` (ASan) and
+  `bench` (`-O3`) presets. First eligible C benchmark: `backtest-small` C median
+  ≈0.0133 ms vs Python 2.3716 ms (~179×), peak RSS 1.9 MB vs 29 MB —
+  `bench/results/20260831/backtest-small-c.json`. This is a numeric-core result
+  only; per §migration it does not by itself justify replacing Python.
 - Risk/blend config is a checksummed input fixture, not an assumed default.
+
+## Toolchain / lint
+- Project `.clang-tidy` disables four checks project-wide with rationale:
+  `readability-identifier-length` and `readability-math-missing-parentheses`
+  (single-letter indices and the Hinnant date algorithm are idiomatic),
+  `bugprone-easily-swappable-parameters` (contract signatures mirror Python; also
+  already disabled for the LWS spike), and
+  `clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling` (it
+  demands Annex-K `snprintf_s`, unavailable on glibc; bounded `snprintf` is
+  correct). CI (`c-quality`) runs clang-tidy over all `core/src/**` and
+  `core/apps/**` production sources, not just the scaffold.
 
 ## Safety invariants
 - MVP-4 validation is an order-disabled deterministic replay shadow. Live shadow
