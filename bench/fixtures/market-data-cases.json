@@ -1,0 +1,32 @@
+{
+  "fixture_version": "market-data-cases-v1",
+  "to_instrument_id": [
+    {"name": "kospi", "ticker": "005930", "market": "KOSPI"},
+    {"name": "kosdaq", "ticker": "035720", "market": "KOSDAQ"},
+    {"name": "nyse", "ticker": "IBM", "market": "NYSE"},
+    {"name": "nasdaq", "ticker": "AAPL", "market": "NASDAQ"}
+  ],
+  "from_instrument_id": [
+    {"name": "ks", "instrument_id": "005930.KS"},
+    {"name": "kq", "instrument_id": "035720.KQ"},
+    {"name": "us", "instrument_id": "AAPL.US"},
+    {"name": "dotted_raw", "instrument_id": "BRK.B.US"},
+    {"name": "no_suffix", "instrument_id": "005930"}
+  ],
+  "sanitize_change_pct": [
+    {"name": "plain", "value": 1.23456},
+    {"name": "round_half_even", "value": 2.4675},
+    {"name": "boundary_max", "value": 999.999},
+    {"name": "over_max", "value": 1000.0},
+    {"name": "negative", "value": -3.14159},
+    {"name": "zero", "value": 0.0}
+  ],
+  "compute_change_pct": [
+    {"name": "up", "current": 51000.0, "previous": 50000.0},
+    {"name": "down", "current": 49000.0, "previous": 50000.0},
+    {"name": "prev_zero", "current": 51000.0, "previous": 0.0},
+    {"name": "prev_negative", "current": 51000.0, "previous": -10.0},
+    {"name": "prev_absent", "current": 51000.0, "previous": null},
+    {"name": "huge_jump", "current": 20000000.0, "previous": 1.0}
+  ]
+}

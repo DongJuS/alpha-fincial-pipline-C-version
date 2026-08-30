@@ -1,0 +1,35 @@
+{
+  "fixture_version": "blend-cases-v1",
+  "nway": [
+    {"name": "empty", "inputs": []},
+    {"name": "single_buy", "inputs": [{"strategy": "A", "signal": "BUY", "confidence": 1.0, "weight": 1.0}]},
+    {"name": "conflict_buy_sell", "inputs": [
+      {"strategy": "A", "signal": "BUY", "confidence": 1.0, "weight": 1.0},
+      {"strategy": "B", "signal": "SELL", "confidence": 1.0, "weight": 1.0}
+    ]},
+    {"name": "zero_weight_equal_fallback", "inputs": [
+      {"strategy": "A", "signal": "BUY", "confidence": 0.8, "weight": 0.0},
+      {"strategy": "B", "signal": "HOLD", "confidence": 0.4, "weight": 0.0}
+    ]},
+    {"name": "threshold_just_above", "inputs": [{"strategy": "A", "signal": "BUY", "confidence": 0.16, "weight": 1.0}]},
+    {"name": "threshold_exactly", "inputs": [{"strategy": "A", "signal": "BUY", "confidence": 0.15, "weight": 1.0}]},
+    {"name": "sell_side", "inputs": [{"strategy": "A", "signal": "SELL", "confidence": 0.5, "weight": 1.0}]},
+    {"name": "invalid_signal_is_hold", "inputs": [{"strategy": "A", "signal": "CLOSE", "confidence": 0.9, "weight": 1.0}]},
+    {"name": "three_way_mixed", "inputs": [
+      {"strategy": "A", "signal": "BUY", "confidence": 0.9, "weight": 0.5},
+      {"strategy": "B", "signal": "BUY", "confidence": 0.6, "weight": 0.3},
+      {"strategy": "S", "signal": "HOLD", "confidence": 0.5, "weight": 0.2}
+    ]},
+    {"name": "clamped_conf_and_weight", "inputs": [
+      {"strategy": "A", "signal": "BUY", "confidence": 1.5, "weight": 2.0},
+      {"strategy": "B", "signal": "SELL", "confidence": -0.2, "weight": -1.0}
+    ]}
+  ],
+  "ab": [
+    {"name": "both_present_conflict", "a_signal": "BUY", "a_confidence": 0.9, "b_signal": "SELL", "b_confidence": 0.8, "blend_ratio": 0.5},
+    {"name": "only_a", "a_signal": "BUY", "a_confidence": 0.7, "b_signal": null, "b_confidence": null, "blend_ratio": 0.3},
+    {"name": "only_b", "a_signal": null, "a_confidence": null, "b_signal": "SELL", "b_confidence": 0.6, "blend_ratio": 0.7},
+    {"name": "ratio_clamped_high", "a_signal": "SELL", "a_confidence": 0.9, "b_signal": "BUY", "b_confidence": 0.9, "blend_ratio": 1.5},
+    {"name": "empty", "a_signal": null, "a_confidence": null, "b_signal": null, "b_confidence": null, "blend_ratio": 0.5}
+  ]
+}
