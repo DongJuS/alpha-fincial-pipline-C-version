@@ -32,6 +32,11 @@
   WS frames may be used only for an optional edge benchmark.
 
 ## External dependencies
+- The P0 LWS spike passed with one LWS service thread scheduling 1 ms,
+  zero-timeout readiness probes for nonblocking libpq/hiredis/curl-multi. This is
+  feasibility evidence only: Phase 3 must select and benchmark a production
+  LWS-owned foreign-fd mechanism and repeat abort/reconnect/backpressure tests.
+  The spike uses no worker threads and dynamically links no libuv/libevent.
 - Phase 0 vendors yyjson 0.10.0 and the permitted Unity 2.6.1 test framework so
   dev/bench builds do not depend on unpinned host packages. Upstream commit IDs
   and licenses are recorded in `third_party/README.md`.
