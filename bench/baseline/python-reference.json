@@ -1,8 +1,8 @@
 {
   "data_contract": {
-    "fixture_version": null,
-    "schema_version": null,
-    "status": "unresolved"
+    "fixture_version": "backtest-small-v1",
+    "schema_version": "bootstrap-sha256:c8b12a9e68b23571b52cb9a5d225d989e331536eee6b955da2d4c0e6d383a4d0",
+    "status": "workload-scoped"
   },
   "dependencies": {
     "exact_lock_available": false,
@@ -12,9 +12,7 @@
   },
   "eligibility": {
     "blockers": [
-      "exact Python dependency environment is not frozen",
-      "schema version is unresolved",
-      "fixture dataset version is unresolved"
+      "exact Python dependency environment is not frozen"
     ],
     "golden_generation": false,
     "performance_publication": false
