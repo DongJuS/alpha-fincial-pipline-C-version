@@ -30,7 +30,7 @@ golden parity against the pinned Python source under both the `dev` (ASan) and
 |-------|-------------|-------|
 | P0 | Pin Python baseline + harness + C scaffold | ✅ done (hosted CI green) |
 | P1 | C numeric slice + first Python/C benchmark | ✅ done (parity dev+bench, ~179× bench) |
-| P2 | C decision core + parity/performance | ⬜ not started |
+| P2 | C decision core + parity/performance | 🟨 in progress (market_data + blending done) |
 | P3 | C drivers against shared infrastructure | ⬜ not started |
 | P4 | Pure-C edges + Rust datalake + optional Rust network comparisons | ⬜ not started |
 | P5 | E2E + consolidated comparison report | ⬜ not started |
@@ -68,6 +68,17 @@ live shadowing or order activation is not authorized by this project.
 
 ## Documentation completed
 
+- 2026-08-31: **P2 part 1 — market_data + blending.** Ported instrument-id maps,
+  `sanitize_change_pct`/`compute_change_pct` (`core/src/market_data`) and the
+  N-way + 2-way blending (`core/src/portfolio/blending.c`). New golden generator
+  `tools/generate_golden_decisions.py` dumps Python outputs for committed
+  `bench/fixtures/{blend,market-data}-cases.json`; C tests
+  (`test_market_data`, `test_blending`) match them under dev+bench. Covers the
+  ±0.15 strict threshold, zero-weight equal fallback, conflict, clamping, dotted
+  raw-code split, and change_pct clamp/round/none paths. blend-batch benchmark
+  (`core/apps/blend_runner.c` + `bench/run_{python,c}_blend.py`, buy-count
+  cross-check): C median ~35 ms vs Python ~526 ms (~15×) over 200k 3-way sets.
+  Remaining P2: risk gates (L1/L2/L3), max-position sizing, indicators/ranking.
 - 2026-08-31: **P1 numeric core.** Ported `cost_model`, `engine`, `metrics`, and
   ReplaySignalSource to C11 (`core/src/{domain,backtest}`, headers in
   `core/include/alpha/`). Golden parity (`core/tests/test_parity_backtest.c`)
