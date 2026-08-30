@@ -2,23 +2,26 @@
 
 > Update this after every task. Keep under ~200 lines. Record *why*, not just *what*.
 
-## Status: Benchmark-driven handoff prepared (pre-implementation)
+## Status: Phase 0 in progress — Python source revision pinned
 
 The specification set is written. No source code exists yet. A developer/AI picks
 up at **Phase 0**, pins the Python reference, and records a baseline before porting.
 
 ## Reference baseline (must be completed in P0)
 
-- Python commit SHA: **UNPINNED — blocks golden generation/public results**
-- Python worktree state: not recorded
-- Schema/fixture version: not recorded
-- Benchmark host/toolchain: not recorded
+- Python commit SHA: `3642cdc0e4026424ca9b6158125551eee1d42683`
+- Python worktree: tracked files clean; untracked `HANDOFF-2026-08-03.md` present
+- Dependency manifest: `requirements.txt`, SHA-256 `bb923cd220358a0d3fd6d2a5889a60a30a49e476f4bd499cd52de21b13fe0837`; no exact lock
+- Schema/fixture version: unresolved; blocks golden generation and public results
+- Benchmark host/toolchain: macOS 26.5.1 arm64, Apple M5 Pro (15 logical CPUs,
+  48 GB), Python 3.14.6, Apple clang 21.0.0, CMake 4.4.3
+- Machine-readable record: `bench/baseline/python-reference.json`
 
 ## Phase tracker
 
 | Phase | Description | State |
 |-------|-------------|-------|
-| P0 | Pin Python baseline + harness + C scaffold | ⬜ not started |
+| P0 | Pin Python baseline + harness + C scaffold | 🟨 in progress (source pin captured) |
 | P1 | C numeric slice + first Python/C benchmark | ⬜ not started |
 | P2 | C decision core + parity/performance | ⬜ not started |
 | P3 | C drivers against shared infrastructure | ⬜ not started |
@@ -45,6 +48,8 @@ up at **Phase 0**, pins the Python reference, and records a baseline before port
 
 ## Documentation completed
 
+- 2026-08-30: pinned the Python source revision, dependency-manifest checksum,
+  dirty state, and benchmark host; unresolved lock/schema/fixtures remain explicit blockers.
 - 2026-08-30: reframed the handoff as a benchmark-driven Python/C/selected-Rust
   comparison; added the normative benchmark protocol and aligned P0–P5 exits.
 - 2026-08-30: locked the selected C/Rust libraries and retained the Python
@@ -54,4 +59,5 @@ up at **Phase 0**, pins the Python reference, and records a baseline before port
 
 ## Next action
 
-Pin the Python reference and start `docs/plans/phase-0-scaffold.md`.
+Freeze the resolved Python dependencies and identify the schema/fixture versions,
+then generate the first golden and measured Python baseline before C claims.
