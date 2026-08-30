@@ -51,6 +51,9 @@ The Python numeric baseline and initial C11 build scaffold are implemented. Phas
 
 ## Documentation completed
 
+- 2026-08-30: added hard-failing CI jobs for the pinned Python golden, dev/bench
+  C builds and tests, compiler-flag verification, formatting, and clang-tidy.
+  Local workflow parsing plus all 17 Python/C checks pass; hosted status awaits push.
 - 2026-08-30: added C11 `libalpha_core`, public domain/error/constants headers,
   pinned yyjson 0.10.0 and Unity 2.6.1, and JSON/ABI/FP smoke tests. Both sanitizer
   `dev` and optimized `bench` presets build and pass; bench forbids fast-math.
@@ -68,5 +71,5 @@ The Python numeric baseline and initial C11 build scaffold are implemented. Phas
 
 ## Next action
 
-Add CI gates and the Phase 0 single-libwebsockets-loop feasibility spike. Keep DB
-schema fixture work blocked until a canonical migration source is identified.
+Add shared PostgreSQL 15/Redis 7 health fixtures and the Phase 0 single-
+libwebsockets-loop feasibility spike. Keep schema-specific DB work blocked.
