@@ -15,6 +15,8 @@ add_library(
     src/backtest/engine.c
     src/market_data/market_data.c
     src/portfolio/blending.c
+    src/portfolio/sizing.c
+    src/risk/gates.c
 )
 add_library(alpha::core ALIAS alpha_core)
 target_include_directories(
@@ -97,3 +99,7 @@ set_tests_properties(market_data PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_D
 alpha_add_test(test_blending)
 add_test(NAME blending COMMAND test_blending)
 set_tests_properties(blending PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+
+alpha_add_test(test_risk)
+add_test(NAME risk COMMAND test_risk)
+set_tests_properties(risk PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
