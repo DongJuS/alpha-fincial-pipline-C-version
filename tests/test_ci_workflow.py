@@ -26,6 +26,12 @@ class CiWorkflowTest(unittest.TestCase):
         self.assertIn("clang-tidy -p build", self.workflow)
         self.assertNotIn("continue-on-error", self.workflow)
 
+    def test_shared_services_run_schema_and_event_loop_gates(self) -> None:
+        self.assertIn('ALPHA_RUN_SCHEMA_APPLY: "1"', self.workflow)
+        self.assertIn("tests.test_schema_apply", self.workflow)
+        self.assertIn('ALPHA_RUN_EVENT_LOOP_SPIKE: "1"', self.workflow)
+        self.assertIn("tests.test_event_loop_spike", self.workflow)
+
 
 if __name__ == "__main__":
     unittest.main()
