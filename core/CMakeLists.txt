@@ -13,6 +13,8 @@ add_library(
     src/backtest/signal_source.c
     src/backtest/metrics.c
     src/backtest/engine.c
+    src/market_data/market_data.c
+    src/portfolio/blending.c
 )
 add_library(alpha::core ALIAS alpha_core)
 target_include_directories(
@@ -39,14 +41,21 @@ if(ALPHA_ENABLE_SANITIZERS)
                            -fno-omit-frame-pointer)
 endif()
 
-# Benchmark / inspection runner.
+# Benchmark / inspection runners.
 add_executable(backtest_runner apps/backtest_runner.c)
 target_link_libraries(backtest_runner PRIVATE alpha_appsupport)
 target_compile_options(backtest_runner PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
+
+add_executable(blend_runner apps/blend_runner.c)
+target_link_libraries(blend_runner PRIVATE alpha::core)
+target_compile_options(blend_runner PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
 if(ALPHA_ENABLE_SANITIZERS)
     target_compile_options(backtest_runner PRIVATE -fsanitize=address,undefined
                            -fno-omit-frame-pointer)
     target_link_options(backtest_runner PRIVATE -fsanitize=address,undefined)
+    target_compile_options(blend_runner PRIVATE -fsanitize=address,undefined
+                           -fno-omit-frame-pointer)
+    target_link_options(blend_runner PRIVATE -fsanitize=address,undefined)
 endif()
 
 add_library(unity STATIC ${PROJECT_SOURCE_DIR}/third_party/unity/unity.c)
@@ -80,3 +89,11 @@ alpha_add_test(test_parity_backtest alpha_appsupport)
 # Golden/fixture paths are relative to the repository root.
 add_test(NAME parity_backtest COMMAND test_parity_backtest)
 set_tests_properties(parity_backtest PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+
+alpha_add_test(test_market_data)
+add_test(NAME market_data COMMAND test_market_data)
+set_tests_properties(market_data PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+
+alpha_add_test(test_blending)
+add_test(NAME blending COMMAND test_blending)
+set_tests_properties(blending PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
