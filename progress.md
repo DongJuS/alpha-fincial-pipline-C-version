@@ -66,6 +66,10 @@ live shadowing or order activation is not authorized by this project.
 
 ## Documentation completed
 
+- 2026-08-30: first hosted run `33315962850` exposed three portability defects:
+  Linux `libm` linkage, missing per-job Python checkout, and clang-analyzer
+  rejection of C buffer APIs. Fixes use UNIX `m`, a pinned detached checkout,
+  aggregate initialization, and `PQconnectStartParams`; hosted rerun is pending.
 - 2026-08-30: proved the locked Python `CREATE_TABLES` bootstrap applies twice to
   an empty PostgreSQL 15 service. The gate parses literal SQL from the pinned
   source instead of copying or importing application code, verifies seven
@@ -107,5 +111,5 @@ live shadowing or order activation is not authorized by this project.
 
 ## Next action
 
-Restore origin connectivity, push `main`, and require hosted CI green to close
-Phase 0 before starting Phase 1.
+Push the hosted-CI portability fixes and require a green rerun; then close the
+remaining P0 scaffold gaps identified by the CTO audit before starting Phase 1.

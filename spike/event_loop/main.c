@@ -444,8 +444,7 @@ static bool complete(const app_t *app) {
 }
 
 static bool setup(app_t *app) {
-    struct lws_context_creation_info info;
-    memset(&info, 0, sizeof(info));
+    struct lws_context_creation_info info = {0};
     info.port = CONTEXT_PORT_NO_LISTEN;
     info.protocols = protocols;
     info.options = LWS_SERVER_OPTION_EXPLICIT_VHOSTS;
@@ -462,12 +461,16 @@ static bool setup(app_t *app) {
     exercise_queue(app);
 
     const char *pg_port = getenv("ALPHA_POSTGRES_PORT");
-    char connection[256];
-    snprintf(connection, sizeof(connection),
-             "host=127.0.0.1 port=%s dbname=alpha_test user=alpha_test "
-             "password=alpha_test_only connect_timeout=5",
-             pg_port == NULL ? "55432" : pg_port);
-    app->pg = PQconnectStart(connection);
+    const char *keywords[] = {"host", "port", "dbname", "user", "password", "connect_timeout",
+                              NULL};
+    const char *values[] = {"127.0.0.1",
+                            pg_port == NULL ? "55432" : pg_port,
+                            "alpha_test",
+                            "alpha_test",
+                            "alpha_test_only",
+                            "5",
+                            NULL};
+    app->pg = PQconnectStartParams(keywords, values, 0);
     if (app->pg == NULL || PQsetnonblocking(app->pg, 1) != 0) {
         return false;
     }
@@ -519,8 +522,7 @@ static void print_result(const app_t *app) {
 }
 
 int main(void) {
-    app_t app;
-    memset(&app, 0, sizeof(app));
+    app_t app = {0};
     app.started = time(NULL);
     lws_set_log_level(LLL_ERR | LLL_WARN, NULL);
     if (curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK || !setup(&app)) {
