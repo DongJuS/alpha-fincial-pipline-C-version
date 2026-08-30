@@ -5,6 +5,11 @@
 /build/
 /target/
 
+# Tooling caches
+.cache/
+__pycache__/
+*.pyc
+
 # OS / editor cruft
 .DS_Store
 *.swp

@@ -62,16 +62,18 @@ jobs:
       - name: Check formatting
         run: >-
           clang-format --dry-run --Werror
-          core/src/alpha.c core/tests/test_scaffold.c
-          core/include/alpha/alpha.h core/include/alpha/constants.h
-          core/include/alpha/domain.h core/include/alpha/errors.h
+          $(find core -name '*.c' -o -name '*.h')
           spike/event_loop/main.c
       - name: Run clang-tidy
         run: >-
           clang-tidy -p build
-          core/src/alpha.c core/tests/test_scaffold.c
+          core/src/alpha.c
+          core/src/domain/date.c core/src/domain/round.c
+          core/src/backtest/cost_model.c core/src/backtest/signal_source.c
+          core/src/backtest/metrics.c core/src/backtest/engine.c
+          core/apps/backtest_fixture.c core/apps/backtest_runner.c
           --warnings-as-errors=*
-          --header-filter='core/(include|src|tests)/.*'
+          --header-filter='core/(include|src|apps)/.*'
       - name: Configure and lint event-loop spike
         run: |
           sudo apt-get update

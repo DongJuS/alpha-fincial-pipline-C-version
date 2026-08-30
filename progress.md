@@ -2,10 +2,12 @@
 
 > Update this after every task. Keep under ~200 lines. Record *why*, not just *what*.
 
-## Status: Phase 0 in progress — single-loop feasibility proven
+## Status: Phase 1 complete — parity-gated C numeric core
 
-The Python baseline, C11 scaffold, shared services, schema bootstrap gate, and
-single-loop spike are implemented. Phase 0 awaits hosted CI confirmation.
+P0 is closed (hosted CI green, run `33318345071`). P1 ports the deterministic
+numeric core — cost model, backtest engine, metrics, ReplaySignalSource — with
+golden parity against the pinned Python source under both the `dev` (ASan) and
+`bench` (`-O3`) presets, unit tests, and the first eligible C benchmark.
 
 ## Reference baseline (must be completed in P0)
 
@@ -26,8 +28,8 @@ single-loop spike are implemented. Phase 0 awaits hosted CI confirmation.
 
 | Phase | Description | State |
 |-------|-------------|-------|
-| P0 | Pin Python baseline + harness + C scaffold | 🟨 in progress (hosted CI remains) |
-| P1 | C numeric slice + first Python/C benchmark | ⬜ not started |
+| P0 | Pin Python baseline + harness + C scaffold | ✅ done (hosted CI green) |
+| P1 | C numeric slice + first Python/C benchmark | ✅ done (parity dev+bench, ~179× bench) |
 | P2 | C decision core + parity/performance | ⬜ not started |
 | P3 | C drivers against shared infrastructure | ⬜ not started |
 | P4 | Pure-C edges + Rust datalake + optional Rust network comparisons | ⬜ not started |
@@ -66,6 +68,16 @@ live shadowing or order activation is not authorized by this project.
 
 ## Documentation completed
 
+- 2026-08-31: **P1 numeric core.** Ported `cost_model`, `engine`, `metrics`, and
+  ReplaySignalSource to C11 (`core/src/{domain,backtest}`, headers in
+  `core/include/alpha/`). Golden parity (`core/tests/test_parity_backtest.c`)
+  matches the pinned Python `BacktestResult` — snapshots, trades, and 4dp/1dp
+  metrics — under both `dev` (ASan) and `bench` (`-O3 -ffp-contract=off`) presets.
+  Python `round` reproduced via `snprintf`+`strtod`; dates as Hinnant epoch-days.
+  Unit suites cover cost/metrics/engine edge cases. First eligible C benchmark
+  `bench/results/20260831/backtest-small-c.json`: C median ≈0.0133 ms vs Python
+  2.3716 ms (~179×), peak RSS 1.9 MB vs 29 MB. clang-format/clang-tidy extended
+  to the new sources; `.clang-tidy` tuned (four checks disabled, see MEMORY).
 - 2026-08-30: first hosted run `33315962850` exposed three portability defects:
   Linux `libm` linkage, missing per-job Python checkout, and clang-analyzer
   rejection of C buffer APIs. Fixes use UNIX `m`, a pinned detached checkout,
@@ -111,5 +123,8 @@ live shadowing or order activation is not authorized by this project.
 
 ## Next action
 
-Push the hosted-CI portability fixes and require a green rerun; then close the
-remaining P0 scaffold gaps identified by the CTO audit before starting Phase 1.
+Start **P2 (risk & portfolio)**: `market_data` normalization, N-way `blending`,
+`risk` gates (stop/take/drawdown/daily breaker), and portfolio sizing, each with
+golden parity and the config-checksum discipline (`docs/MODULE_SPECS.md §1,4,5`,
+`docs/plans/phase-2-risk-portfolio.md`). Then P3 drivers up to the **MVP-2**
+driver-I/O GO/NO-GO gate.
