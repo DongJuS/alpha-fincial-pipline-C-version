@@ -69,6 +69,8 @@ bool alpha_pg_wants_read(const alpha_pg_t *db);
 bool alpha_pg_wants_write(const alpha_pg_t *db);
 size_t alpha_pg_pending(const alpha_pg_t *db);
 size_t alpha_pg_capacity(const alpha_pg_t *db);
+/* True only after both request results and the pipeline sync boundary drain. */
+bool alpha_pg_is_idle(const alpha_pg_t *db);
 const char *alpha_pg_error(const alpha_pg_t *db);
 
 /* Advances connection polling, output flushing, and result draining. readable
