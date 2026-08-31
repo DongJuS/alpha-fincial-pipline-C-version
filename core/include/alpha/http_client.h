@@ -58,6 +58,8 @@ void alpha_http_multi_destroy(alpha_http_multi_t *client);
 size_t alpha_http_pending(const alpha_http_multi_t *client);
 
 alpha_err_t alpha_http_post_json(alpha_http_multi_t *client, const alpha_http_post_t *post);
+/* Cancel the pending request identified by its opaque user_data. */
+alpha_err_t alpha_http_cancel(alpha_http_multi_t *client, void *user_data);
 
 /* Drive only from the owner loop. watch is the readiness reported for socket_fd. */
 alpha_err_t alpha_http_multi_socket_action(alpha_http_multi_t *client, int socket_fd,

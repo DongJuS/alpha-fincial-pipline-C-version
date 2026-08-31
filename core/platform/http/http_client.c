@@ -225,6 +225,31 @@ alpha_err_t alpha_http_post_json(alpha_http_multi_t *client, const alpha_http_po
     return ALPHA_OK;
 }
 
+alpha_err_t alpha_http_cancel(alpha_http_multi_t *client, void *user_data) {
+    if (client == NULL || user_data == NULL) {
+        return ALPHA_ERR_INVALID_ARG;
+    }
+    alpha_http_request_t *request = client->requests;
+    while (request != NULL && request->user_data != user_data) {
+        request = request->next;
+    }
+    if (request == NULL) {
+        return ALPHA_ERR_RANGE;
+    }
+    (void)curl_multi_remove_handle(client->multi, request->easy);
+    const alpha_http_result_t result = {
+        .kind = request->kind,
+        .status_code = 0,
+        .transport_code = CURLE_ABORTED_BY_CALLBACK,
+        .response_body = request->response != NULL ? request->response : "",
+        .response_size = request->response_size,
+        .user_data = request->user_data,
+    };
+    client->complete_fn(client->callback_ctx, &result);
+    unlink_and_free(client, request);
+    return ALPHA_OK;
+}
+
 alpha_err_t alpha_http_multi_socket_action(alpha_http_multi_t *client, int socket_fd,
                                            alpha_http_watch_t watch, int *running_out) {
     const unsigned ready = (unsigned)watch;
