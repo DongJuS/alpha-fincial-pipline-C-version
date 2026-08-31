@@ -22,9 +22,12 @@ typedef struct {
     int socket_fd;
     alpha_redis_watch_t watch;
     int connected;
+    int connection_events;
     int replied;
     alpha_err_t status;
-    char text[16];
+    long long integer;
+    void *user_data;
+    char text[128];
 } async_state_t;
 
 static void async_watch(void *ctx, int socket_fd, alpha_redis_watch_t watch) {
@@ -38,16 +41,17 @@ static void async_timer(void *ctx, long timeout_ms) {
 }
 static void async_connected(void *ctx, alpha_err_t status) {
     async_state_t *state = ctx;
-    state->connected = 1;
+    state->connection_events++;
+    state->connected = status == ALPHA_OK;
     state->status = status;
 }
 static void async_replied(void *ctx, alpha_err_t status, const char *text, long long integer,
                           void *user_data) {
-    (void)integer;
-    (void)user_data;
     async_state_t *state = ctx;
     state->replied = 1;
     state->status = status;
+    state->integer = integer;
+    state->user_data = user_data;
     if (text != NULL)
         (void)snprintf(state->text, sizeof(state->text), "%s", text);
 }
@@ -235,6 +239,87 @@ static void test_hiredis_async_is_caller_loop_driven(void) {
     alpha_redis_async_close(redis);
 }
 
+static void test_hiredis_async_typed_queue_disconnect_and_reconnect(void) {
+    async_state_t state = {.socket_fd = -1};
+    alpha_redis_async_t *redis = NULL;
+    TEST_ASSERT_EQUAL_INT(ALPHA_OK, alpha_redis_async_connect("127.0.0.1", g_port, async_watch,
+                                                              async_timer, async_connected,
+                                                              async_replied, &state, &redis));
+    drive_async(redis, &state, &state.connected);
+
+    int set_id = 11;
+    state.replied = 0;
+    TEST_ASSERT_EQUAL_INT(ALPHA_OK, alpha_redis_async_set_latest_tick(redis, "ASYNC_TEST",
+                                                                      "{\"price\":123}", &set_id));
+    drive_async(redis, &state, &state.replied);
+    TEST_ASSERT_EQUAL_PTR(&set_id, state.user_data);
+    TEST_ASSERT_EQUAL_STRING("OK", state.text);
+
+    int get_id = 12;
+    state.replied = 0;
+    state.text[0] = '\0';
+    TEST_ASSERT_EQUAL_INT(ALPHA_OK,
+                          alpha_redis_async_get_latest_tick(redis, "ASYNC_TEST", &get_id));
+    drive_async(redis, &state, &state.replied);
+    TEST_ASSERT_EQUAL_PTR(&get_id, state.user_data);
+    TEST_ASSERT_EQUAL_STRING("{\"price\":123}", state.text);
+
+    /* Queue ownership is deterministic even before the owner services readiness. */
+    const char *ping[] = {"PING"};
+    const size_t ping_lengths[] = {4};
+    for (size_t index = 0; index < ALPHA_REDIS_ASYNC_MAX_PENDING; ++index) {
+        TEST_ASSERT_EQUAL_INT(ALPHA_OK,
+                              alpha_redis_async_command(redis, 1, ping, ping_lengths, NULL));
+    }
+    TEST_ASSERT_EQUAL_size_t(ALPHA_REDIS_ASYNC_MAX_PENDING, alpha_redis_async_pending(redis));
+    TEST_ASSERT_EQUAL_INT(ALPHA_ERR_RANGE,
+                          alpha_redis_async_command(redis, 1, ping, ping_lengths, NULL));
+    while (alpha_redis_async_pending(redis) > 0) {
+        state.replied = 0;
+        drive_async(redis, &state, &state.replied);
+    }
+
+    /* Ask Redis for this connection id, then kill it from an independent client. */
+    const char *client_id[] = {"CLIENT", "ID"};
+    const size_t client_id_lengths[] = {6, 2};
+    state.replied = 0;
+    state.integer = 0;
+    TEST_ASSERT_EQUAL_INT(ALPHA_OK,
+                          alpha_redis_async_command(redis, 2, client_id, client_id_lengths, NULL));
+    drive_async(redis, &state, &state.replied);
+    TEST_ASSERT_GREATER_THAN_INT64(0, state.integer);
+    redisContext *raw = raw_connect();
+    redisReply *killed = redisCommand(raw, "CLIENT KILL ID %lld", state.integer);
+    TEST_ASSERT_NOT_NULL(killed);
+    TEST_ASSERT_EQUAL_INT(REDIS_REPLY_INTEGER, killed->type);
+    TEST_ASSERT_EQUAL_INT64(1, killed->integer);
+    freeReplyObject(killed);
+    redisFree(raw);
+
+    for (int attempt = 0; attempt < 100 && state.connected; ++attempt) {
+        struct pollfd descriptor = {.fd = state.socket_fd, .events = POLLIN | POLLOUT};
+        TEST_ASSERT_GREATER_OR_EQUAL_INT(0, poll(&descriptor, 1, 100));
+        alpha_redis_watch_t ready = ALPHA_REDIS_WATCH_NONE;
+        if ((descriptor.revents & (POLLIN | POLLHUP | POLLERR)) != 0) {
+            ready = (alpha_redis_watch_t)(ready | ALPHA_REDIS_WATCH_READ);
+        }
+        if ((descriptor.revents & POLLOUT) != 0) {
+            ready = (alpha_redis_watch_t)(ready | ALPHA_REDIS_WATCH_WRITE);
+        }
+        (void)alpha_redis_async_service(redis, ready);
+    }
+    TEST_ASSERT_FALSE(state.connected);
+    TEST_ASSERT_EQUAL_INT(-1, alpha_redis_async_socket(redis));
+    TEST_ASSERT_EQUAL_INT(ALPHA_OK, alpha_redis_async_reconnect(redis));
+    drive_async(redis, &state, &state.connected);
+    state.replied = 0;
+    TEST_ASSERT_EQUAL_INT(ALPHA_OK,
+                          alpha_redis_async_get_latest_tick(redis, "ASYNC_TEST", &get_id));
+    drive_async(redis, &state, &state.replied);
+    TEST_ASSERT_EQUAL_STRING("{\"price\":123}", state.text);
+    alpha_redis_async_close(redis);
+}
+
 int main(void) {
     const char *require = getenv("ALPHA_RUN_REDIS_INTEGRATION");
     const char *port_str = getenv("ALPHA_REDIS_PORT");
@@ -256,6 +341,7 @@ int main(void) {
     RUN_TEST(test_breaker_lockout_lifecycle);
     RUN_TEST(test_calendar_driven_weekend_holiday_and_missing_fail_closed);
     RUN_TEST(test_hiredis_async_is_caller_loop_driven);
+    RUN_TEST(test_hiredis_async_typed_queue_disconnect_and_reconnect);
     const int failures = UNITY_END();
     alpha_redis_close(g_redis);
     return failures;
