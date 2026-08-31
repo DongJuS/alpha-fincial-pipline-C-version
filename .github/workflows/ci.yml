@@ -144,6 +144,13 @@ jobs:
         env:
           ALPHA_RUN_EVENT_LOOP_SPIKE: "1"
         run: python -m unittest tests.test_event_loop_spike -v
+      - name: Build platform drivers and run integration tests
+        env:
+          ALPHA_RUN_REDIS_INTEGRATION: "1"
+        run: |
+          cmake -S . -B build/drivers -DALPHA_WITH_DRIVERS=ON -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build/drivers --parallel
+          ctest --test-dir build/drivers -R redis_cache --output-on-failure
       - name: Stop shared services
         if: always()
         run: docker compose down --volumes
