@@ -1,5 +1,5 @@
 [workspace]
-members = ["datalake"]
+members = ["datalake", "driver-bench"]
 resolver = "2"
 
 [workspace.package]
@@ -11,4 +11,9 @@ arrow = { version = "=54.3.1", default-features = false }
 aws-config = { version = "=1.5.17", default-features = false }
 aws-sdk-s3 = { version = "=1.78.0", default-features = false }
 parquet = { version = "=54.3.1", default-features = false }
+fred = { version = "=10.1.0", default-features = false, features = ["i-keys"] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = { version = "=1.0.145" }
+sqlx = { version = "=0.8.6", default-features = false, features = ["runtime-tokio", "postgres"] }
+thiserror = { version = "=2.0.17" }
 tokio = { version = "=1.43.0", default-features = false }
