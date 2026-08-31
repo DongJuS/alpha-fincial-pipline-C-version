@@ -1,4 +1,5 @@
 #include "alpha/postgres.h"
+#include "alpha/round.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -18,6 +19,7 @@ struct alpha_pg {
     alpha_pg_state_t state;
     PostgresPollingStatusType connect_poll;
     bool flush_pending;
+    bool sync_sent;
     pending_request_t *fifo;
     size_t capacity;
     size_t head;
@@ -131,7 +133,7 @@ bool alpha_pg_wants_read(const alpha_pg_t *db) {
     if (db->state == ALPHA_PG_CONNECTING && db->connect_poll == PGRES_POLLING_READING) {
         return true;
     }
-    if (db->state == ALPHA_PG_READY && db->count > 0) {
+    if (db->state == ALPHA_PG_READY && (db->count > 0 || db->sync_sent)) {
         return true;
     }
     return false;
@@ -144,7 +146,7 @@ bool alpha_pg_wants_write(const alpha_pg_t *db) {
     if (db->state == ALPHA_PG_CONNECTING && db->connect_poll == PGRES_POLLING_WRITING) {
         return true;
     }
-    if (db->state == ALPHA_PG_READY && db->flush_pending) {
+    if (db->state == ALPHA_PG_READY && (db->flush_pending || (db->count > 0 && !db->sync_sent))) {
         return true;
     }
     return false;
@@ -187,8 +189,9 @@ static bool parse_exposure(PGresult *pg, alpha_pg_result_t *result) {
         !parse_i32(PQgetvalue(pg, 0, 4), &e->strategy_count)) {
         return false;
     }
-    e->exposure_pct =
+    const double unrounded =
         e->total_aum > 0 ? (double)e->total_market_value / (double)e->total_aum * 100.0 : 0.0;
+    e->exposure_pct = alpha_round_dp(unrounded, 2);
     return true;
 }
 
@@ -196,10 +199,18 @@ static alpha_err_t drain_results(alpha_pg_t *db) {
     while (!PQisBusy(db->conn)) {
         PGresult *pg = PQgetResult(db->conn);
         if (pg == NULL) {
+            /* In pipeline mode libpq may emit a NULL query boundary while
+             * additional queued results are already available. Re-check
+             * PQisBusy instead of waiting for a socket edge that will not
+             * recur for buffered input. */
+            if (db->count > 0 || db->sync_sent) {
+                continue;
+            }
             break;
         }
         const ExecStatusType status = PQresultStatus(pg);
         if (status == PGRES_PIPELINE_SYNC) {
+            db->sync_sent = false;
             PQclear(pg);
             continue;
         }
@@ -220,7 +231,9 @@ static alpha_err_t drain_results(alpha_pg_t *db) {
         }
         if (!parsed) {
             result.status = ALPHA_ERR_DB;
-            set_error(db, PQresultErrorMessage(pg));
+            set_error(db, status == PGRES_PIPELINE_ABORTED
+                              ? "request aborted by an earlier pipeline statement"
+                              : PQresultErrorMessage(pg));
         }
         PQclear(pg);
         complete_head(db, &result);
@@ -263,6 +276,15 @@ alpha_err_t alpha_pg_service(alpha_pg_t *db, bool readable, bool writable) {
     if (db->state == ALPHA_PG_CONNECTING) {
         return service_connect(db, readable, writable);
     }
+    if (writable && db->count > 0 && !db->sync_sent) {
+        if (PQpipelineSync(db->conn) != 1) {
+            set_error(db, PQerrorMessage(db->conn));
+            db->state = ALPHA_PG_FAILED;
+            return ALPHA_ERR_DB;
+        }
+        db->sync_sent = true;
+        db->flush_pending = true;
+    }
     if (writable && db->flush_pending) {
         const int flushed = PQflush(db->conn);
         if (flushed < 0) {
@@ -290,8 +312,10 @@ static alpha_err_t send_request(alpha_pg_t *db, alpha_pg_result_kind_t kind, con
     if (db->count == db->capacity) {
         return ALPHA_ERR_RANGE;
     }
-    if (PQsendQueryParams(db->conn, sql, nparams, NULL, params, NULL, NULL, 0) != 1 ||
-        PQpipelineSync(db->conn) != 1) {
+    if (db->sync_sent) {
+        return ALPHA_ERR_RANGE;
+    }
+    if (PQsendQueryParams(db->conn, sql, nparams, NULL, params, NULL, NULL, 0) != 1) {
         set_error(db, PQerrorMessage(db->conn));
         return ALPHA_ERR_DB;
     }
