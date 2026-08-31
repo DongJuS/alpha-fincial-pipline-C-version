@@ -1,7 +1,9 @@
 /* blend_runner — benchmarks alpha_blend_signals over a deterministic synthetic
  * batch. The batch formula is mirrored byte-for-byte in bench/run_python_blend.py
  * so the emitted BUY-count checksum cross-checks that both variants processed the
- * identical workload. Timing statistics are computed by the Python wrapper. */
+ * identical workload. Timing statistics are computed by the Python wrapper.
+ * _DEFAULT_SOURCE (set by CMake) exposes clock_gettime/getrusage under -std=c11
+ * on glibc; macOS ignores it and exposes them by default. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

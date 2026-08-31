@@ -6,6 +6,16 @@
 #include "alpha/date.h"
 #include "yyjson.h"
 
+/* Bounded copy with explicit terminator (avoids gcc -Wstringop-truncation). */
+static void copy_bounded(char *dst, const char *src, size_t cap) {
+    size_t len = strlen(src);
+    if (len >= cap) {
+        len = cap - 1;
+    }
+    memcpy(dst, src, len);
+    dst[len] = '\0';
+}
+
 static alpha_err_t parse_signal(const char *text, alpha_signal_t *out) {
     if (strcmp(text, "BUY") == 0) {
         *out = ALPHA_SIGNAL_BUY;
@@ -30,10 +40,8 @@ static alpha_err_t parse_config(yyjson_val *cfg, alpha_backtest_config_t *out) {
     if (ticker == NULL || strategy == NULL) {
         return ALPHA_ERR_INVALID_ARG;
     }
-    strncpy(out->ticker, ticker, ALPHA_TICKER_CAP - 1);
-    out->ticker[ALPHA_TICKER_CAP - 1] = '\0';
-    strncpy(out->strategy, strategy, ALPHA_STRATEGY_CAP - 1);
-    out->strategy[ALPHA_STRATEGY_CAP - 1] = '\0';
+    copy_bounded(out->ticker, ticker, ALPHA_TICKER_CAP);
+    copy_bounded(out->strategy, strategy, ALPHA_STRATEGY_CAP);
 
     struct {
         const char *key;

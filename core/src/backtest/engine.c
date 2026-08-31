@@ -13,8 +13,13 @@ typedef struct {
 } engine_state_t;
 
 static void copy_ticker(char *dst, const char *src) {
-    strncpy(dst, src, ALPHA_TICKER_CAP - 1);
-    dst[ALPHA_TICKER_CAP - 1] = '\0';
+    /* memcpy + explicit terminator avoids gcc -Wstringop-truncation on strncpy. */
+    size_t len = strlen(src);
+    if (len >= ALPHA_TICKER_CAP) {
+        len = ALPHA_TICKER_CAP - 1;
+    }
+    memcpy(dst, src, len);
+    dst[len] = '\0';
 }
 
 /* _open_position: all-cash integer-share buy with the rounding guard.
