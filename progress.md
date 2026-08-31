@@ -145,8 +145,16 @@ live shadowing or order activation is not authorized by this project.
 
 ## Next action
 
-Start **P2 (risk & portfolio)**: `market_data` normalization, N-way `blending`,
-`risk` gates (stop/take/drawdown/daily breaker), and portfolio sizing, each with
-golden parity and the config-checksum discipline (`docs/MODULE_SPECS.md §1,4,5`,
-`docs/plans/phase-2-risk-portfolio.md`). Then P3 drivers up to the **MVP-2**
-driver-I/O GO/NO-GO gate.
+Reopen **P0 contract closure** before further feature work: add the minimal pinned
+Rust datalake workspace, replace distro libwebsockets with the exact source pin,
+and execute/assert the two locked database migrations. Then finish the remaining
+P2 screener contract and enter P3 only after P0 evidence is complete.
+
+## 2026-08-31 — P2 risk benchmark
+
+- Added identical 100,000-snapshot Python/C risk workloads covering stop/take,
+  daily loss, and paper/real max-position decisions. All four counts and the
+  combined checksum match; the C benchmark is parity-gated before timing.
+- Recorded 10 raw trials: Python median 28.7343 ms and C median 0.4110 ms on this
+  host. This is arithmetic-only evidence using the documented transcription,
+  not a live-I/O or migration claim.
