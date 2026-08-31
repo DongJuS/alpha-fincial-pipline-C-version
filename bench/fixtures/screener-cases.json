@@ -1,0 +1,42 @@
+{
+  "fixture_version": "screener-cases-v1",
+  "thresholds": {"volume_surge_ratio": 2.0, "change_pct_threshold": 3.0},
+  "score": [
+    {"name": "insufficient_data", "bars": [
+      {"volume": 300, "change_pct": 5.0}, {"volume": 100}, {"volume": 100}, {"volume": 100}
+    ]},
+    {"name": "volume_surge", "bars": [
+      {"volume": 300, "change_pct": 0.0}, {"volume": 100}, {"volume": 100}, {"volume": 100}, {"volume": 100}
+    ]},
+    {"name": "boundary_volume_2x", "bars": [
+      {"volume": 200, "change_pct": 0.0}, {"volume": 100}, {"volume": 100}, {"volume": 100}, {"volume": 100}
+    ]},
+    {"name": "change_only", "bars": [
+      {"volume": 100, "change_pct": 3.5}, {"volume": 100}, {"volume": 100}, {"volume": 100}, {"volume": 100}
+    ]},
+    {"name": "boundary_change_3pct", "bars": [
+      {"volume": 100, "change_pct": 3.0}, {"volume": 100}, {"volume": 100}, {"volume": 100}, {"volume": 100}
+    ]},
+    {"name": "no_pass", "bars": [
+      {"volume": 100, "change_pct": 1.0}, {"volume": 100}, {"volume": 100}, {"volume": 100}, {"volume": 100}
+    ]},
+    {"name": "null_change", "bars": [
+      {"volume": 150, "change_pct": null}, {"volume": 100}, {"volume": 100}, {"volume": 100}, {"volume": 100}
+    ]}
+  ],
+  "select": [
+    {"name": "top_two_with_tie", "cap": 2, "candidates": [
+      {"passes": true, "score": 1.5}, {"passes": true, "score": 2.0},
+      {"passes": false, "score": 9.0}, {"passes": true, "score": 2.0}
+    ]},
+    {"name": "cap_exceeds_candidates", "cap": 5, "candidates": [
+      {"passes": true, "score": 1.0}, {"passes": false, "score": 4.0}
+    ]},
+    {"name": "none_pass", "cap": 3, "candidates": [
+      {"passes": false, "score": 5.0}, {"passes": false, "score": 1.0}
+    ]},
+    {"name": "descending_order", "cap": 3, "candidates": [
+      {"passes": true, "score": 0.5}, {"passes": true, "score": 3.0}, {"passes": true, "score": 1.5}
+    ]}
+  ]
+}

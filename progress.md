@@ -2,12 +2,14 @@
 
 > Update this after every task. Keep under ~200 lines. Record *why*, not just *what*.
 
-## Status: Phase 1 complete — parity-gated C numeric core
+## Status: Phase 2 complete — parity-gated C decision core
 
-P0 is closed (hosted CI green, run `33318345071`). P1 ports the deterministic
-numeric core — cost model, backtest engine, metrics, ReplaySignalSource — with
-golden parity against the pinned Python source under both the `dev` (ASan) and
-`bench` (`-O3`) presets, unit tests, and the first eligible C benchmark.
+P0 contracts and P1 numeric core are closed. P2 ports the full deterministic
+decision layer — market_data normalization, N-way/2-way blending, the risk gates
+(L1 stop/take, L2 drawdown weakest-two, L3 daily breaker), max-position sizing,
+and the screener filter — each golden-gated against the pinned Python source
+under both `dev` (ASan) and `bench` (`-O3`) presets, with blend and risk batch
+benchmarks. Next is P3 nonblocking drivers, up to the MVP-2 GO/NO-GO gate.
 
 ## Reference baseline (must be completed in P0)
 
@@ -30,7 +32,7 @@ golden parity against the pinned Python source under both the `dev` (ASan) and
 |-------|-------------|-------|
 | P0 | Pin Python baseline + harness + C scaffold | ✅ done (hosted CI green) |
 | P1 | C numeric slice + first Python/C benchmark | ✅ done (parity dev+bench, ~179× bench) |
-| P2 | C decision core + parity/performance | 🟨 nearly done (decisions+risk done; indicators left) |
+| P2 | C decision core + parity/performance | ✅ done (decisions+risk+screener; blend/risk benchmarks) |
 | P3 | C drivers against shared infrastructure | ⬜ not started |
 | P4 | Pure-C edges + Rust datalake + optional Rust network comparisons | ⬜ not started |
 | P5 | E2E + consolidated comparison report | ⬜ not started |
@@ -67,6 +69,15 @@ error, drop, resource, or safety regression. MVP-4 uses replay-shadow evidence;
 live shadowing or order activation is not authorized by this project.
 
 ## Documentation completed
+
+- 2026-08-31: **P2 part 3 (final) — screener filter.** Ported the non-RL daily
+  screener decision logic (`core/src/indicators/screener.c`): `_score_ticker`
+  (volume-surge ratio + change-pct, `>=` thresholds, `<5`-bar skip) and the
+  passing/score-descending/top-10 selection (stable on ties). Golden parity
+  (`test_screener`) against a Python transcription (screener.py imports DB/logging
+  at module load) under dev+bench, covering both threshold boundaries, volume-only
+  vs change-only, insufficient data, null change, and selection tie order.
+  Completes the P2 §7 contract; ranking_calculator stays with P3 aggregate SQL.
 
 - 2026-08-31: **P2 part 2 — risk gates + max-position sizing.** Ported the
   safety-critical decision gates as pure, no-I/O functions (`core/src/risk/gates.c`,
@@ -145,10 +156,13 @@ live shadowing or order activation is not authorized by this project.
 
 ## Next action
 
-Reopen **P0 contract closure** before further feature work: add the minimal pinned
-Rust datalake workspace, replace distro libwebsockets with the exact source pin,
-and execute/assert the two locked database migrations. Then finish the remaining
-P2 screener contract and enter P3 only after P0 evidence is complete.
+P0 contracts are closed (pinned Rust datalake workspace, source-pinned
+libwebsockets, locked migrations) and P2 is complete (market_data, blending,
+risk gates, sizing, screener — all parity-gated; blend + risk batch benchmarks).
+Enter **P3 (C nonblocking drivers)**: `platform/db` (nonblocking libpq, bounded
+pipeline), `platform/cache` (hiredis async), required libcurl-multi HTTP, all on
+the libwebsockets-owned loop, against the shared Docker Postgres/Redis. This is
+the run-up to the **MVP-2 driver-I/O GO/NO-GO** gate (`docs/plans/phase-3-drivers.md`).
 
 ## 2026-08-31 — P2 risk benchmark
 
