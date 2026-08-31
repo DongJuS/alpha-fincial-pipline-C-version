@@ -54,15 +54,19 @@ static void connected(const redisAsyncContext *context, int status) {
 static void replied(redisAsyncContext *context, void *raw, void *user_data) {
     alpha_redis_async_t *redis = context->data;
     redisReply *reply = raw;
+    alpha_err_t status = ALPHA_ERR_IO;
+    const char *text = NULL;
+    long long integer = 0;
     if (reply != NULL && (reply->type == REDIS_REPLY_STRING || reply->type == REDIS_REPLY_STATUS)) {
-        redis->reply_fn(redis->callback_ctx, ALPHA_OK, reply->str, 0, user_data);
+        status = ALPHA_OK;
+        text = reply->str;
     } else if (reply != NULL && reply->type == REDIS_REPLY_INTEGER) {
-        redis->reply_fn(redis->callback_ctx, ALPHA_OK, NULL, reply->integer, user_data);
+        status = ALPHA_OK;
+        integer = reply->integer;
     } else if (reply != NULL && reply->type == REDIS_REPLY_NIL) {
-        redis->reply_fn(redis->callback_ctx, ALPHA_OK, NULL, 0, user_data);
-    } else {
-        redis->reply_fn(redis->callback_ctx, ALPHA_ERR_IO, NULL, 0, user_data);
+        status = ALPHA_OK;
     }
+    redis->reply_fn(redis->callback_ctx, status, text, integer, user_data);
 }
 
 alpha_err_t alpha_redis_async_connect(const char *host, int port, alpha_redis_watch_fn watch_fn,
