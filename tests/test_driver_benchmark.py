@@ -70,6 +70,7 @@ class DriverBenchmarkTest(unittest.TestCase):
         results = run.build_results(records, FIXTURE, SOURCES)
         self.assertEqual(18, len(results))
         self.assertTrue(all(doc["summary"]["sample_count"] == 30 for doc in results))
+        self.assertTrue(all(doc["throughput_summary"]["sample_count"] == 30 for doc in results))
         self.assertEqual([0, 2, 1] * 10, results[1]["trial_order_index"])
 
     def test_requires_all_clean_variants_and_30_trials(self):
