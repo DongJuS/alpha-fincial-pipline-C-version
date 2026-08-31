@@ -43,7 +43,8 @@ JSON object:
 
 The orchestrator rejects checksum, completion-order, parity, configuration,
 error, drop, and source-cleanliness failures. It emits 18 files: two cases ×
-three concurrencies × three variants, each with 30 raw order-rotated samples.
+three concurrencies × three variants, each with 30 raw order-rotated latency and
+derived operation-throughput samples.
 `evaluate_mvp2.py` uses deterministic paired bootstrap resampling and returns
 `GO` only when every cell's 95% speedup interval is above 1.0 and candidate
 CPU/RSS ratios stay within the supplied limits (default: no regression).

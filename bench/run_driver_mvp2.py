@@ -39,14 +39,14 @@ def percentile(values: list[float], q: float) -> float:
     return ordered[lo] if lo == hi else ordered[lo] + (ordered[hi] - ordered[lo]) * (rank - lo)
 
 
-def summary(values: list[float]) -> dict[str, float | int]:
+def summary(values: list[float], unit: str = "ms") -> dict[str, float | int]:
     return {
-        "median_ms": statistics.median(values),
-        "p95_ms": percentile(values, 0.95),
-        "p99_ms": percentile(values, 0.99),
-        "min_ms": min(values),
-        "max_ms": max(values),
-        "stddev_ms": statistics.stdev(values),
+        f"median_{unit}": statistics.median(values),
+        f"p95_{unit}": percentile(values, 0.95),
+        f"p99_{unit}": percentile(values, 0.99),
+        f"min_{unit}": min(values),
+        f"max_{unit}": max(values),
+        f"stddev_{unit}": statistics.stdev(values),
         "sample_count": len(values),
     }
 
@@ -184,6 +184,8 @@ def build_results(records: list[dict], fixture: Path, sources: dict[str, str]) -
     for (case, concurrency, variant), group in sorted(grouped.items()):
         group.sort(key=lambda item: item["trial"])
         samples = [float(item["adapter"]["elapsed_ms"]) for item in group]
+        operation_count = group[0]["adapter"]["configuration"]["operation_count"]
+        throughput_samples = [operation_count * 1000.0 / sample for sample in samples]
         commit, _clean = sources[variant].rsplit(":", 1)
         results.append({
             "case": case,
@@ -203,8 +205,10 @@ def build_results(records: list[dict], fixture: Path, sources: dict[str, str]) -
                 "configuration": group[0]["adapter"]["configuration"],
             },
             "samples_ms": samples,
+            "throughput_ops_s_samples": throughput_samples,
             "trial_order_index": [item["order_index"] for item in group],
             "summary": summary(samples),
+            "throughput_summary": summary(throughput_samples, "ops_s"),
             "resources": {
                 "peak_rss_bytes": max(item["adapter"].get("resources", {}).get("peak_rss_bytes", 0) for item in group),
                 "cpu_time_ms": sum(item["adapter"].get("resources", {}).get("cpu_time_ms", 0) for item in group),

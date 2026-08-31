@@ -69,6 +69,7 @@ def evaluate(paths: list[Path], candidate: str, max_rss_ratio: float = 1.0, max_
             })
     return {
         "candidate": candidate,
+        "primary_metric": "paired batch-throughput speedup",
         "decision": "GO" if all(d["go"] for d in decisions) else "NO-GO",
         "comparisons": decisions,
     }
