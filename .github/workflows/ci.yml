@@ -149,7 +149,8 @@ jobs:
           ALPHA_RUN_REDIS_INTEGRATION: "1"
           ALPHA_RUN_POSTGRES_INTEGRATION: "1"
         run: |
-          cmake -S . -B build/drivers -DALPHA_WITH_DRIVERS=ON -DCMAKE_BUILD_TYPE=Debug
+          cmake -S . -B build/drivers -DALPHA_WITH_DRIVERS=ON -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
           cmake --build build/drivers --parallel
           ctest --test-dir build/drivers -R 'redis_cache|postgres|http_client' --output-on-failure
           clang-tidy -p build/drivers \

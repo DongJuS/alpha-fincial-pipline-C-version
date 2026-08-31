@@ -8,7 +8,7 @@
 typedef struct alpha_http_multi alpha_http_multi_t;
 
 #define ALPHA_HTTP_MAX_PENDING 64U
-#define ALPHA_HTTP_MAX_RESPONSE_BYTES (1024U * 1024U)
+#define ALPHA_HTTP_MAX_RESPONSE_BYTES ((size_t)1024 * (size_t)1024)
 
 typedef enum {
     ALPHA_HTTP_POST_GENERIC_JSON = 0,

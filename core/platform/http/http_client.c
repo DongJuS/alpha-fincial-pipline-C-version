@@ -51,12 +51,8 @@ static int curl_socket_changed(CURL *easy, curl_socket_t socket_fd, int action, 
     (void)socket_ctx;
     alpha_http_multi_t *client = ctx;
     alpha_http_watch_t watch = ALPHA_HTTP_WATCH_NONE;
-    if (action == CURL_POLL_IN) {
-        watch = ALPHA_HTTP_WATCH_READ;
-    } else if (action == CURL_POLL_OUT) {
-        watch = ALPHA_HTTP_WATCH_WRITE;
-    } else if (action == CURL_POLL_INOUT) {
-        watch = ALPHA_HTTP_WATCH_READ_WRITE;
+    if (action >= CURL_POLL_IN && action <= CURL_POLL_INOUT) {
+        watch = (alpha_http_watch_t)action;
     }
     client->watch_fn(client->callback_ctx, (int)socket_fd, watch);
     return 0;
