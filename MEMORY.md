@@ -113,6 +113,13 @@
   correct). CI (`c-quality`) runs clang-tidy over all `core/src/**` and
   `core/apps/**` production sources, not just the scaffold.
 
+## Benchmark scope
+
+- **Risk-batch is arithmetic-only.** Its Python side is the reviewed transcription
+  already accepted for risk goldens because the pinned methods are async and
+  database-coupled. Exact decision counts/checksum must match before C timing is
+  eligible; results must not be described as live Python service performance.
+
 ## Safety invariants
 - MVP-4 validation is an order-disabled deterministic replay shadow. Live shadow
   access, production deployment, and real-order activation require separate approval.
