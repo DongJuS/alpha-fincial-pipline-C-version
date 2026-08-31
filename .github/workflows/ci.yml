@@ -75,7 +75,7 @@ jobs:
           core/src/portfolio/sizing.c core/src/risk/gates.c
           core/src/indicators/screener.c core/src/calendar/market_hours.c
           core/apps/backtest_fixture.c core/apps/backtest_runner.c
-          core/apps/blend_runner.c core/apps/risk_runner.c core/apps/risk_runner.c
+          core/apps/blend_runner.c core/apps/risk_runner.c
           --warnings-as-errors=*
           --header-filter='core/(include|src|apps)/.*'
       - name: Configure and lint event-loop spike
@@ -147,10 +147,16 @@ jobs:
       - name: Build platform drivers and run integration tests
         env:
           ALPHA_RUN_REDIS_INTEGRATION: "1"
+          ALPHA_RUN_POSTGRES_INTEGRATION: "1"
         run: |
           cmake -S . -B build/drivers -DALPHA_WITH_DRIVERS=ON -DCMAKE_BUILD_TYPE=Debug
           cmake --build build/drivers --parallel
-          ctest --test-dir build/drivers -R redis_cache --output-on-failure
+          ctest --test-dir build/drivers -R 'redis_cache|postgres|http_client' --output-on-failure
+          clang-tidy -p build/drivers \
+            core/platform/cache/redis_cache.c core/platform/cache/redis_async.c \
+            core/platform/db/postgres.c \
+            core/platform/http/http_client.c --warnings-as-errors='*' \
+            --header-filter='core/(include|platform)/.*'
       - name: Stop shared services
         if: always()
         run: docker compose down --volumes
