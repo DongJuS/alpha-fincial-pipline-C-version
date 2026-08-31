@@ -197,6 +197,44 @@ def build_risk(fixture: dict) -> dict:
     }
 
 
+# ── screener ────────────────────────────────────────────────────────────────
+# screener.py imports DB/logging at module load, so (like the risk gates) the
+# reference below transcribes the pure _score_ticker + selection arithmetic
+# line-for-line from src/agents/screener.py @ the pinned commit.
+
+
+def screener_score(bars: list[dict], vol_th: float, pct_th: float) -> dict:
+    if len(bars) < 5:  # _MIN_DATA_DAYS
+        return {"passes": False, "score": 0.0}
+    today = bars[0]
+    past = bars[1:]
+    avg = sum(b["volume"] for b in past) / len(past) if past else 0.0
+    ratio = today["volume"] / avg if avg > 0 else 0.0
+    change = abs(today.get("change_pct") or 0.0)
+    return {"passes": ratio >= vol_th or change >= pct_th, "score": ratio / vol_th + change / pct_th}
+
+
+def screener_select(candidates: list[dict], cap: int) -> list[int]:
+    passed = [(i, c["score"]) for i, c in enumerate(candidates) if c["passes"]]
+    passed.sort(key=lambda item: item[1], reverse=True)  # stable descending
+    return [i for i, _ in passed[:cap]]
+
+
+def build_screener(fixture: dict) -> dict:
+    vol_th = fixture["thresholds"]["volume_surge_ratio"]
+    pct_th = fixture["thresholds"]["change_pct_threshold"]
+    return {
+        "score": [
+            {"name": c["name"], **screener_score(c["bars"], vol_th, pct_th)}
+            for c in fixture["score"]
+        ],
+        "select": [
+            {"name": c["name"], "selected": screener_select(c["candidates"], c["cap"])}
+            for c in fixture["select"]
+        ],
+    }
+
+
 def build_golden(source: Path, fixture_path: Path, case: str) -> dict:
     assert_pinned_source(source)
     fixture_bytes = fixture_path.read_bytes()
@@ -205,6 +243,8 @@ def build_golden(source: Path, fixture_path: Path, case: str) -> dict:
         result = build_blend(load_modules(source), fixture)
     elif case == "market-data-cases":
         result = build_market(load_modules(source), fixture)
+    elif case == "screener-cases":
+        result = build_screener(fixture)
     else:
         result = build_risk(fixture)
     golden = {
@@ -227,7 +267,7 @@ def main() -> int:
     parser.add_argument("--fixtures", type=Path, default=Path("bench/fixtures"))
     parser.add_argument("--output", type=Path, default=Path("core/tests/golden"))
     args = parser.parse_args()
-    for case in ("blend-cases", "market-data-cases", "risk-cases"):
+    for case in ("blend-cases", "market-data-cases", "risk-cases", "screener-cases"):
         golden = build_golden(args.source, args.fixtures / f"{case}.json", case)
         out = args.output / f"{case}.json"
         out.parent.mkdir(parents=True, exist_ok=True)

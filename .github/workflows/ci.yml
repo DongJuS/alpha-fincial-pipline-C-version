@@ -73,8 +73,9 @@ jobs:
           core/src/backtest/metrics.c core/src/backtest/engine.c
           core/src/market_data/market_data.c core/src/portfolio/blending.c
           core/src/portfolio/sizing.c core/src/risk/gates.c
+          core/src/indicators/screener.c
           core/apps/backtest_fixture.c core/apps/backtest_runner.c
-          core/apps/blend_runner.c core/apps/risk_runner.c
+          core/apps/blend_runner.c core/apps/risk_runner.c core/apps/risk_runner.c
           --warnings-as-errors=*
           --header-filter='core/(include|src|apps)/.*'
       - name: Configure and lint event-loop spike
