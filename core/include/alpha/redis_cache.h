@@ -32,15 +32,23 @@ alpha_err_t alpha_redis_get_latest_tick(alpha_redis_t *redis, const char *ticker
                                         size_t n, bool *has_value);
 
 /* Breaker lockout (C safety enhancement): store the absolute expires_at (epoch
- * seconds) at risk:breaker_lockout:{scope} with TTL = expires_at - now_epoch, so
- * the flag self-clears exactly at the next trading session. Rejects
- * expires_at <= now_epoch with ALPHA_ERR_INVALID_ARG (never sets a stale/past
- * lockout, so a fail-closed calendar sentinel keeps any existing lockout). */
+ * seconds) at the Python-owned hard_stop:lockout:{scope} key and use Redis EXAT,
+ * so expiry does not depend on caller clock arithmetic. `now_epoch` is retained
+ * as a contract guard; Redis server time is also checked before the write. */
 alpha_err_t alpha_redis_set_breaker_lockout(alpha_redis_t *redis, const char *scope,
                                             int64_t now_epoch, int64_t expires_at_epoch);
 
-/* Check the breaker lockout. Present -> *locked=true and *expires_at_out is the
- * stored epoch; absent/expired -> *locked=false. */
+/* Load fresh `krx:holidays:{year}` JSON calendars from Redis, compute the next
+ * KRX session, and install the lockout atomically with respect to its expiry.
+ * Missing, expired, malformed, or insufficient calendars return an error and
+ * never clear/shorten an existing lockout (fail closed). */
+alpha_err_t alpha_redis_set_breaker_lockout_next_session(alpha_redis_t *redis, const char *scope,
+                                                         int64_t now_epoch,
+                                                         int64_t *expires_at_out);
+
+/* Check the breaker lockout. Stored values must be a canonical, future absolute
+ * epoch consistent with the key TTL. Malformed/inconsistent values fail closed:
+ * *locked remains true and ALPHA_ERR_IO is returned. */
 alpha_err_t alpha_redis_is_breaker_locked(alpha_redis_t *redis, const char *scope, bool *locked,
                                           int64_t *expires_at_out);
 
