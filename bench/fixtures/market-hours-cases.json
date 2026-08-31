@@ -1,0 +1,10 @@
+{
+  "fixture_version": "market-hours-cases-v1",
+  "weekend_only": [
+    {"name": "friday_afternoon", "from_kst": "2024-01-05T14:30:00"},
+    {"name": "saturday", "from_kst": "2024-01-06T10:00:00"},
+    {"name": "sunday_night", "from_kst": "2024-01-07T23:00:00"},
+    {"name": "midweek_wednesday", "from_kst": "2024-01-10T09:00:00"},
+    {"name": "friday_just_before_midnight", "from_kst": "2024-01-05T23:59:59"}
+  ]
+}

@@ -33,7 +33,7 @@ benchmarks. Next is P3 nonblocking drivers, up to the MVP-2 GO/NO-GO gate.
 | P0 | Pin Python baseline + harness + C scaffold | ✅ done (hosted CI green) |
 | P1 | C numeric slice + first Python/C benchmark | ✅ done (parity dev+bench, ~179× bench) |
 | P2 | C decision core + parity/performance | ✅ done (decisions+risk+screener; blend/risk benchmarks) |
-| P3 | C drivers against shared infrastructure | ⬜ not started |
+| P3 | C drivers against shared infrastructure | 🟨 started (KRX calendar core; drivers next) |
 | P4 | Pure-C edges + Rust datalake + optional Rust network comparisons | ⬜ not started |
 | P5 | E2E + consolidated comparison report | ⬜ not started |
 
@@ -70,6 +70,16 @@ live shadowing or order activation is not authorized by this project.
 
 ## Documentation completed
 
+- 2026-08-31: **P3 unit 1 — KRX trading-calendar core** (pure, no I/O). Ported
+  `next_trading_day_start` as `alpha_next_trading_session_start` (weekend-only,
+  exact epoch parity with the pinned Python) plus a holiday-aware safety variant
+  that skips supplied holidays and returns a fail-closed sentinel when the
+  candidate day is beyond calendar coverage (so a missing/stale
+  `krx:holidays:{year}` never releases a breaker early). KST is treated as a
+  fixed UTC+9, so the math is exact integer epoch arithmetic. Golden parity
+  (`test_market_hours`) under dev+bench. This is the expiry the P3 Redis breaker
+  lockout will use; drivers (hiredis/libpq/libcurl) follow per
+  `docs/plans/20260831-p3-drivers.md`.
 - 2026-08-31: **P2 part 3 (final) — screener filter.** Ported the non-RL daily
   screener decision logic (`core/src/indicators/screener.c`): `_score_ticker`
   (volume-surge ratio + change-pct, `>=` thresholds, `<5`-bar skip) and the
