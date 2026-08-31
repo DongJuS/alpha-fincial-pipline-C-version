@@ -107,6 +107,22 @@
   fixture; the golden records its SHA-256 and the C test asserts the fixture
   equals the Python-compatible defaults.
 
+## Drivers (P3)
+- **Platform I/O drivers build behind `-DALPHA_WITH_DRIVERS=ON`** (default OFF).
+  The `c-build` CI jobs stay driverless (pure core); the `shared-services` job
+  (which installs libhiredis/libpq/libcurl and runs Docker Postgres/Redis) builds
+  drivers and runs the integration tests. Each integration test skips (passes)
+  when its service is unreachable unless `ALPHA_RUN_*_INTEGRATION` is set.
+- **Redis breaker lockout is a documented C safety enhancement.** The pinned
+  Python `_is_daily_loss_blocked` recomputes today's realized-pnl each call (no
+  persistent flag). The C driver stores an absolute `expires_at` (next KRX
+  session, [[market-hours]]) at `risk:breaker_lockout:{scope}` with a matching
+  TTL; a past/sentinel expiry is rejected so a fail-closed calendar keeps the
+  lockout. `latest_ticks:{ticker}` (TTL 60) keeps exact Python key parity.
+- Redis driver uses a **synchronous hiredis connection** for correctness +
+  integration testing; the libwebsockets-loop async integration and the
+  `redis-hot-path`/`db-read-write` benchmarks (the MVP-2 gate) are a later P3 unit.
+
 ## Toolchain / lint
 - Project `.clang-tidy` disables four checks project-wide with rationale:
   `readability-identifier-length` and `readability-math-missing-parentheses`
