@@ -34,9 +34,11 @@ static int foreign_fd_callback(struct lws *wsi, enum lws_callback_reasons reason
         return 0;
     }
     switch (reason) {
+    case LWS_CALLBACK_RAW_RX:
     case LWS_CALLBACK_RAW_RX_FILE:
         watch->ready_fn(watch->callback_ctx, true, false, false);
         break;
+    case LWS_CALLBACK_RAW_WRITEABLE:
     case LWS_CALLBACK_RAW_WRITEABLE_FILE:
         if (watch->wants_write) {
             watch->ready_fn(watch->callback_ctx, false, true, false);
@@ -45,6 +47,7 @@ static int foreign_fd_callback(struct lws *wsi, enum lws_callback_reasons reason
     case LWS_CALLBACK_TIMER:
         watch->ready_fn(watch->callback_ctx, false, false, true);
         break;
+    case LWS_CALLBACK_RAW_CLOSE:
     case LWS_CALLBACK_RAW_CLOSE_FILE:
         watch->wsi = NULL;
         break;
@@ -59,7 +62,15 @@ static const struct lws_protocols PROTOCOLS[] = {
     LWS_PROTOCOL_LIST_TERM,
 };
 
-static void service_wakeup(lws_sorted_usec_list_t *scheduled) { (void)scheduled; }
+static void service_wakeup(lws_sorted_usec_list_t *scheduled) {
+    alpha_lws_runtime_t *runtime = lws_container_of(scheduled, alpha_lws_runtime_t, wakeup);
+    for (size_t i = 0; i < runtime->capacity; ++i) {
+        alpha_lws_watch_t *watch = &runtime->watches[i];
+        if (watch->active && watch->wants_write) {
+            watch->ready_fn(watch->callback_ctx, false, true, false);
+        }
+    }
+}
 
 alpha_err_t alpha_lws_runtime_create(size_t watch_capacity, alpha_lws_runtime_t **out) {
     if (watch_capacity == 0 || watch_capacity > 256 || out == NULL) {
