@@ -33,7 +33,7 @@ benchmarks. Next is P3 nonblocking drivers, up to the MVP-2 GO/NO-GO gate.
 | P0 | Pin Python baseline + harness + C scaffold | ✅ done (hosted CI green) |
 | P1 | C numeric slice + first Python/C benchmark | ✅ done (parity dev+bench, ~179× bench) |
 | P2 | C decision core + parity/performance | ✅ done (decisions+risk+screener; blend/risk benchmarks) |
-| P3 | C drivers against shared infrastructure | 🟨 started (KRX calendar core; drivers next) |
+| P3 | C drivers against shared infrastructure | 🟨 in progress (calendar + Redis driver; libpq/http next) |
 | P4 | Pure-C edges + Rust datalake + optional Rust network comparisons | ⬜ not started |
 | P5 | E2E + consolidated comparison report | ⬜ not started |
 
@@ -70,6 +70,17 @@ live shadowing or order activation is not authorized by this project.
 
 ## Documentation completed
 
+- 2026-08-31: **P3 unit 2 — Redis cache driver (hiredis).** Added
+  `core/platform/cache/redis_cache.c` (`alpha/redis_cache.h`): `latest_ticks:{ticker}`
+  set/get with the Python TTL (60s, key pattern `redis:cache:latest_ticks:{ticker}`)
+  and the breaker-lockout safety enhancement — store the absolute `expires_at` from
+  unit 1's next-session calendar with TTL = expires_at − now, so it self-clears at
+  the next session; a past/sentinel expiry is rejected (fail-closed, keeps any
+  existing lockout). Drivers build behind the opt-in `-DALPHA_WITH_DRIVERS=ON`
+  (the driverless `c-build` jobs are unchanged); the integration test connects to
+  the docker-compose Redis and runs in the `shared-services` CI job
+  (`ALPHA_RUN_REDIS_INTEGRATION=1`), skipping gracefully when Redis is absent.
+  Verified locally against Docker Redis. Next: libpq (nonblocking) + libcurl HTTP.
 - 2026-08-31: **P3 unit 1 — KRX trading-calendar core** (pure, no I/O). Ported
   `next_trading_day_start` as `alpha_next_trading_session_start` (weekend-only,
   exact epoch parity with the pinned Python) plus a holiday-aware safety variant
