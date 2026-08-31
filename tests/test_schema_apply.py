@@ -32,6 +32,17 @@ class SchemaApplyTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 MODULE.extract_create_tables(source)
 
+    def test_extracts_locked_incremental_migrations_without_importing(self) -> None:
+        statements = MODULE.extract_locked_migrations(SOURCE)
+        self.assertEqual(6, len(statements))
+        joined = "\n".join(statements)
+        self.assertIn("PARTITION BY RANGE (bucket_at)", joined)
+        self.assertIn("ohlcv_minute_2026_04", joined)
+        self.assertIn("ohlcv_minute_2026_05", joined)
+        self.assertIn("ohlcv_minute_2026_06", joined)
+        self.assertIn("idx_ohlcv_minute_bucket", joined)
+        self.assertIn("idx_ohlcv_minute_instrument", joined)
+
     @unittest.skipUnless(
         os.environ.get("ALPHA_RUN_SCHEMA_APPLY") == "1",
         "set ALPHA_RUN_SCHEMA_APPLY=1 with PostgreSQL running",
@@ -43,7 +54,11 @@ class SchemaApplyTests(unittest.TestCase):
         )
         lock = ROOT / "bench/baseline/python-schema-lock.json"
         MODULE.apply(SOURCE, lock, database_url)
+        first_catalog = MODULE.catalog_snapshot(database_url)
         MODULE.apply(SOURCE, lock, database_url)
+        second_catalog = MODULE.catalog_snapshot(database_url)
+        self.assertRegex(first_catalog, r"^[0-9a-f]{32}$")
+        self.assertEqual(first_catalog, second_catalog)
         query = "SELECT to_regclass('public.' || name) IS NOT NULL FROM unnest(ARRAY[{}]) name".format(
             ",".join(f"'{table}'" for table in MODULE.REQUIRED_TABLES)
         )

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "name": "libwebsockets",
+  "repository": "https://github.com/warmcat/libwebsockets.git",
+  "tag": "v4.3.3",
+  "commit": "4415e84c095857629863804e941b9e1c2e9347ef",
+  "pkg_config_version": "4.3.3-v4.3.3",
+  "cmake": {
+    "LWS_WITH_SHARED": "OFF",
+    "LWS_WITH_STATIC": "ON",
+    "LWS_WITH_SSL": "OFF",
+    "LWS_WITH_LIBUV": "OFF",
+    "LWS_WITH_LIBEVENT": "OFF",
+    "LWS_WITH_GLIB": "OFF",
+    "LWS_WITH_EVLIB_PLUGINS": "OFF",
+    "LWS_WITHOUT_TESTAPPS": "ON"
+  }
+}
