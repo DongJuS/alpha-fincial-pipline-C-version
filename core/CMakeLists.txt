@@ -18,6 +18,7 @@ add_library(
     src/portfolio/sizing.c
     src/risk/gates.c
     src/indicators/screener.c
+    src/calendar/market_hours.c
 )
 add_library(alpha::core ALIAS alpha_core)
 target_include_directories(
@@ -118,3 +119,7 @@ set_tests_properties(risk PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 alpha_add_test(test_screener)
 add_test(NAME screener COMMAND test_screener)
 set_tests_properties(screener PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+
+alpha_add_test(test_market_hours)
+add_test(NAME market_hours COMMAND test_market_hours)
+set_tests_properties(market_hours PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

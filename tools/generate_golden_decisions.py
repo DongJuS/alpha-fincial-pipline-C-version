@@ -235,6 +235,44 @@ def build_screener(fixture: dict) -> dict:
     }
 
 
+# ── market hours (KRX trading calendar) ──────────────────────────────────────
+# Transcribes src/utils/market_hours.py next_trading_day_start (weekend-only).
+# Asia/Seoul is a fixed UTC+9 with no DST, so KST math is exact integer epoch
+# arithmetic and needs no timezone database.
+_KST_OFFSET = 32400
+
+
+def _kst_epoch(iso: str) -> int:
+    from datetime import date
+
+    day_part, time_part = iso.split("T")
+    year, month, dom = (int(x) for x in day_part.split("-"))
+    hour, minute, second = (int(x) for x in time_part.split(":"))
+    epoch_day = date(year, month, dom).toordinal() - date(1970, 1, 1).toordinal()
+    return epoch_day * 86400 + hour * 3600 + minute * 60 + second - _KST_OFFSET
+
+
+def _next_session_epoch(from_epoch: int) -> int:
+    day = (from_epoch + _KST_OFFSET) // 86400 + 1
+    while (day + 3) % 7 >= 5:  # Sat(5)/Sun(6)
+        day += 1
+    return day * 86400 + 9 * 3600 - _KST_OFFSET
+
+
+def build_market_hours(fixture: dict) -> dict:
+    weekend_only = []
+    for case in fixture["weekend_only"]:
+        from_epoch = _kst_epoch(case["from_kst"])
+        weekend_only.append(
+            {
+                "name": case["name"],
+                "from_epoch": from_epoch,
+                "expected_epoch": _next_session_epoch(from_epoch),
+            }
+        )
+    return {"weekend_only": weekend_only}
+
+
 def build_golden(source: Path, fixture_path: Path, case: str) -> dict:
     assert_pinned_source(source)
     fixture_bytes = fixture_path.read_bytes()
@@ -245,6 +283,8 @@ def build_golden(source: Path, fixture_path: Path, case: str) -> dict:
         result = build_market(load_modules(source), fixture)
     elif case == "screener-cases":
         result = build_screener(fixture)
+    elif case == "market-hours-cases":
+        result = build_market_hours(fixture)
     else:
         result = build_risk(fixture)
     golden = {
@@ -267,7 +307,13 @@ def main() -> int:
     parser.add_argument("--fixtures", type=Path, default=Path("bench/fixtures"))
     parser.add_argument("--output", type=Path, default=Path("core/tests/golden"))
     args = parser.parse_args()
-    for case in ("blend-cases", "market-data-cases", "risk-cases", "screener-cases"):
+    for case in (
+        "blend-cases",
+        "market-data-cases",
+        "risk-cases",
+        "screener-cases",
+        "market-hours-cases",
+    ):
         golden = build_golden(args.source, args.fixtures / f"{case}.json", case)
         out = args.output / f"{case}.json"
         out.parent.mkdir(parents=True, exist_ok=True)
