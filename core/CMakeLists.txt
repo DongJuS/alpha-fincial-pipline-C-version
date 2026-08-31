@@ -132,8 +132,10 @@ option(ALPHA_WITH_DRIVERS "Build platform I/O drivers + integration tests" OFF)
 if(ALPHA_WITH_DRIVERS)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(HIREDIS REQUIRED hiredis)
+    pkg_check_modules(LIBPQ REQUIRED libpq)
+    pkg_check_modules(LIBCURL REQUIRED libcurl)
 
-    add_library(alpha_cache STATIC platform/cache/redis_cache.c)
+    add_library(alpha_cache STATIC platform/cache/redis_cache.c platform/cache/redis_async.c)
     target_include_directories(alpha_cache PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
                                ${HIREDIS_INCLUDE_DIRS})
     target_link_directories(alpha_cache PUBLIC ${HIREDIS_LIBRARY_DIRS})
@@ -153,4 +155,36 @@ if(ALPHA_WITH_DRIVERS)
         target_link_options(test_redis_cache PRIVATE -fsanitize=address,undefined)
     endif()
     add_test(NAME redis_cache COMMAND test_redis_cache)
+
+    add_library(alpha_postgres STATIC platform/db/postgres.c)
+    target_include_directories(alpha_postgres PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+                               ${LIBPQ_INCLUDE_DIRS})
+    target_link_directories(alpha_postgres PUBLIC ${LIBPQ_LIBRARY_DIRS})
+    target_link_libraries(alpha_postgres PUBLIC alpha::core ${LIBPQ_LIBRARIES})
+    target_compile_options(alpha_postgres PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
+
+    add_executable(test_postgres tests/test_postgres.c)
+    target_link_libraries(test_postgres PRIVATE alpha_postgres unity)
+    target_compile_options(test_postgres PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
+    add_test(NAME postgres COMMAND test_postgres)
+
+    add_library(alpha_http STATIC platform/http/http_client.c)
+    target_include_directories(alpha_http PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+                               ${LIBCURL_INCLUDE_DIRS})
+    target_link_directories(alpha_http PUBLIC ${LIBCURL_LIBRARY_DIRS})
+    target_link_libraries(alpha_http PUBLIC alpha::core ${LIBCURL_LIBRARIES})
+    target_compile_options(alpha_http PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
+
+    add_executable(test_http_client tests/test_http_client.c)
+    target_link_libraries(test_http_client PRIVATE alpha_http unity)
+    target_compile_options(test_http_client PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
+    add_test(NAME http_client COMMAND test_http_client)
+
+    if(ALPHA_ENABLE_SANITIZERS)
+        foreach(target alpha_postgres test_postgres alpha_http test_http_client)
+            target_compile_options(${target} PRIVATE -fsanitize=address,undefined
+                                   -fno-omit-frame-pointer)
+            target_link_options(${target} PRIVATE -fsanitize=address,undefined)
+        endforeach()
+    endif()
 endif()
