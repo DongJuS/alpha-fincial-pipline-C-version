@@ -1,6 +1,8 @@
 /* backtest_runner — loads a bench fixture and either prints the result summary
  * or benchmarks the engine. Timing statistics are computed by the Python
- * wrapper (bench/run_c_backtest.py) so all variants share one methodology. */
+ * wrapper (bench/run_c_backtest.py) so all variants share one methodology.
+ * _DEFAULT_SOURCE (set by CMake) exposes clock_gettime/getrusage under -std=c11
+ * on glibc; macOS ignores it and exposes them by default. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
