@@ -170,4 +170,4 @@ P2 screener contract and enter P3 only after P0 evidence is complete.
 - The locked schema tool now applies bootstrap plus minute-bar migration SQL and
   asserts v2 constraints/FKs, exact partitions/indexes, routing, rejection, and
   catalog idempotence. Local PostgreSQL integration and 33 Python tests passed;
-  hosted CI remains required before marking this closure complete.
+  hosted branch CI `33345361616` passed all six jobs, closing these P0 gaps.
