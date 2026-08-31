@@ -2,8 +2,9 @@
 """Run parity-gated, order-rotated P3 driver trials against real adapters.
 
 Each adapter command receives ``--fixture``, ``--case``, ``--concurrency`` and
-``--trial``. It must print one JSON object with elapsed_ms, fixture_sha256,
-completed_ids, result_sha256, errors, dropped, and optional resource/build data.
+``--trial`` and ``--namespace``. It must print one JSON object with elapsed_ms,
+fixture/terminal checksums, every completion token, per-operation latency,
+errors, drops, and resource/build metadata.
 Timing and service setup stay inside the adapter so setup can be excluded.
 """
 from __future__ import annotations
@@ -14,6 +15,7 @@ import json
 import math
 import platform
 import shlex
+import shutil
 import statistics
 import subprocess
 from collections import defaultdict
@@ -22,6 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CONCURRENCIES = (1, 8, 32)
 CASES = ("redis-hot-path", "db-read-write")
+EVENT_LOOPS = {"python": "asyncio", "c": "lws", "rust": "tokio"}
 
 
 def canonical(value: object) -> bytes:
@@ -78,10 +81,25 @@ def inspect_source(path_text: str) -> str:
     return f"{commit}:clean"
 
 
-def run_adapter(command: str, fixture: Path, case: str, concurrency: int, trial: int) -> dict:
+def adapter_attestation(command: str) -> dict[str, str]:
+    argv = shlex.split(command)
+    command_sha = hashlib.sha256(canonical(argv)).hexdigest()
+    candidates = [Path(token) for token in argv[1:] if Path(token).is_file()]
+    executable = shutil.which(argv[0])
+    if not candidates and executable is not None:
+        candidates = [Path(executable)]
+    if len(candidates) != 1:
+        raise ValueError(f"adapter command must resolve exactly one artifact: {command}")
+    artifact = candidates[0].resolve()
+    return {"command_sha256": command_sha, "artifact_sha256": sha256_file(artifact),
+            "artifact": str(artifact.relative_to(ROOT)) if artifact.is_relative_to(ROOT) else artifact.name}
+
+
+def run_adapter(command: str, fixture: Path, case: str, concurrency: int, trial: int, namespace: str) -> dict:
     argv = shlex.split(command) + [
         "--fixture", str(fixture), "--case", case,
         "--concurrency", str(concurrency), "--trial", str(trial),
+        "--namespace", namespace,
     ]
     proc = subprocess.run(argv, cwd=ROOT, check=False, capture_output=True, text=True)
     if proc.returncode != 0:
@@ -91,7 +109,8 @@ def run_adapter(command: str, fixture: Path, case: str, concurrency: int, trial:
     except json.JSONDecodeError as exc:
         raise ValueError(f"adapter did not emit one JSON object: {proc.stdout!r}") from exc
     required = {
-        "elapsed_ms", "fixture_sha256", "completed_ids", "result_sha256",
+        "elapsed_ms", "fixture_sha256", "completed_tokens", "operation_latency_ns",
+        "terminal", "result_sha256",
         "errors", "dropped", "configuration", "resources", "build",
     }
     if not isinstance(value, dict) or not required <= value.keys():
@@ -113,7 +132,8 @@ def run_adapter(command: str, fixture: Path, case: str, concurrency: int, trial:
 
 
 def execute(
-    fixture: Path, adapters: dict[str, str], sources: dict[str, str], trials: int
+    fixture: Path, adapters: dict[str, str], sources: dict[str, str], trials: int,
+    attestations: dict[str, dict[str, str]] | None = None,
 ) -> list[dict]:
     if trials < 30:
         raise ValueError("MVP-2 requires at least 30 trials")
@@ -124,44 +144,74 @@ def execute(
         raise ValueError("every adapter requires --source VARIANT=COMMIT:clean")
     fixture_sha = sha256_file(fixture)
     fixture_data = json.loads(fixture.read_bytes())
+    contract = fixture_data["contract"]
+    if hashlib.sha256(canonical(contract["service_config"])).hexdigest() != contract["service_config_sha256"]:
+        raise ValueError("fixture service configuration checksum mismatch")
+    schema_lock = ROOT / "bench/baseline/python-schema-lock.json"
+    if sha256_file(schema_lock) != contract["schema_sha256"]:
+        raise ValueError("fixture schema checksum mismatch")
+    attestations = attestations or {variant: {"command_sha256": "test", "artifact_sha256": "test", "artifact": "test"} for variant in variants}
     records: list[dict] = []
     for case in CASES:
-        operation_ids = [op["id"] for op in fixture_data["cases"][case]["operations"]]
         case_config = fixture_data["cases"][case]
+        expected_tokens = [f"{iteration:06d}:{operation['id']}"
+                           for iteration in range(case_config["repeat"])
+                           for operation in case_config["operations"]]
         case_result_hash: str | None = None
         for concurrency in CONCURRENCIES:
             for trial in range(trials):
                 order = variants[trial % len(variants):] + variants[:trial % len(variants)]
                 baseline_hash: str | None = None
                 for order_index, variant in enumerate(order):
-                    out = run_adapter(adapters[variant], fixture, case, concurrency, trial)
+                    namespace = f"mvp2-{case}-c{concurrency}-t{trial}"
+                    out = run_adapter(adapters[variant], fixture, case, concurrency, trial, namespace)
                     if out["fixture_sha256"] != fixture_sha:
                         raise ValueError(f"{variant}: fixture checksum mismatch")
-                    if out["completed_ids"] != operation_ids:
-                        raise ValueError(f"{variant}: completed IDs differ or are out of order")
+                    if out["completed_tokens"] != expected_tokens:
+                        raise ValueError(f"{variant}: completion tokens differ or are out of order")
+                    latencies = out["operation_latency_ns"]
+                    if (not isinstance(latencies, list) or len(latencies) != len(expected_tokens) or
+                            any(not isinstance(value, int) or value <= 0 for value in latencies)):
+                        raise ValueError(f"{variant}: operation latency samples are invalid")
+                    if out["terminal"] != case_config["terminal"]:
+                        raise ValueError(f"{variant}: terminal payload differs from committed golden")
+                    if out["result_sha256"] != case_config["terminal_sha256"]:
+                        raise ValueError(f"{variant}: terminal checksum differs from committed golden")
+                    if hashlib.sha256(canonical(out["terminal"])).hexdigest() != out["result_sha256"]:
+                        raise ValueError(f"{variant}: terminal payload/checksum mismatch")
                     if out["errors"] != 0 or out["dropped"] != 0:
                         raise ValueError(f"{variant}: errors/drops make the trial ineligible")
                     config = out["configuration"]
                     expected_config = {
                         "concurrency": concurrency,
-                        "operation_count": len(operation_ids) * case_config["repeat"],
-                        "pipeline_depth": case_config["pipeline_depth"],
+                        "operation_count": len(case_config["operations"]) * case_config["repeat"],
+                        "pipeline_depth": contract["pipeline_depth"],
                         "timeout_ms": case_config["timeout_ms"],
                         "worker_count": 1,
-                        "queue_depth": case_config["pipeline_depth"],
+                        "queue_depth": contract["queue_depth"],
                         "connection_count": case_config["connection_count"],
+                        "retry_policy": contract["retry_policy"],
+                        "saturation_policy": contract["saturation_policy"],
+                        "service_config_sha256": contract["service_config_sha256"],
+                        "schema_sha256": contract["schema_sha256"],
                     }
                     if not isinstance(config, dict) or any(
                         config.get(key) != value for key, value in expected_config.items()
                     ):
                         raise ValueError(f"{variant}: workload configuration mismatch")
-                    if not isinstance(config.get("event_loop_mode"), str) or not config["event_loop_mode"]:
-                        raise ValueError(f"{variant}: event_loop_mode is required")
+                    if config.get("event_loop_mode") != EVENT_LOOPS[variant]:
+                        raise ValueError(f"{variant}: event_loop_mode mismatch")
+                    build = out["build"]
+                    if (not isinstance(build, dict) or not all(build.get(key) for key in ("runtime", "compiler", "flags")) or
+                            not isinstance(build.get("dependencies"), dict) or not build["dependencies"] or
+                            any(not isinstance(value, str) or not value for value in build["dependencies"].values())):
+                        raise ValueError(f"{variant}: incomplete build/dependency metadata")
                     if variant == "python":
                         baseline_hash = out["result_sha256"]
                     records.append({
                         "case": case, "concurrency": concurrency, "trial": trial,
                         "order_index": order_index, "variant": variant, "adapter": out,
+                        "attestation": attestations[variant],
                     })
                 if baseline_hash is None:
                     raise AssertionError("Python baseline did not run")
@@ -196,7 +246,7 @@ def build_results(records: list[dict], fixture: Path, sources: dict[str, str]) -
                 "golden_sha256": fixture_sha,
                 "result_sha256": group[0]["adapter"]["result_sha256"],
             },
-            "source": {"commit": commit, "dirty": False},
+            "source": {"commit": commit, "dirty": False, "adapter": group[0]["attestation"]},
             "environment": {"host_id": platform.node(), "cpu": platform.machine(), "os": platform.platform()},
             "build": group[0]["adapter"]["build"],
             "workload": {
@@ -214,6 +264,7 @@ def build_results(records: list[dict], fixture: Path, sources: dict[str, str]) -
                 "cpu_time_ms": sum(item["adapter"].get("resources", {}).get("cpu_time_ms", 0) for item in group),
             },
             "resource_samples": [item["adapter"].get("resources", {}) for item in group],
+            "operation_latency_ns_samples": [item["adapter"]["operation_latency_ns"] for item in group],
             "errors": {"count": 0, "dropped": 0},
         })
     return results
@@ -230,7 +281,8 @@ def main() -> int:
     adapters = parse_assignments(args.adapter, "adapter")
     source_paths = parse_assignments(args.source, "source")
     sources = {variant: inspect_source(path) for variant, path in source_paths.items()}
-    records = execute(args.fixture, adapters, sources, args.trials)
+    attestations = {variant: adapter_attestation(command) for variant, command in adapters.items()}
+    records = execute(args.fixture, adapters, sources, args.trials, attestations)
     results = build_results(records, args.fixture, sources)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     for result in results:
