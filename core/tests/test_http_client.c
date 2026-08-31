@@ -2,13 +2,16 @@
 #include "unity.h"
 
 #include <arpa/inet.h>
+#include <curl/curl.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 typedef struct {
@@ -16,9 +19,11 @@ typedef struct {
     alpha_http_watch_t watch;
     long timeout_ms;
     int completions;
-    alpha_http_post_kind_t kinds[2];
-    long statuses[2];
-    char bodies[2][32];
+    alpha_http_post_kind_t kinds[8];
+    long statuses[8];
+    int transports[8];
+    void *user_data[8];
+    char bodies[8][32];
 } loop_state_t;
 
 void setUp(void) {}
@@ -43,16 +48,51 @@ static void schedule_timer(void *ctx, long timeout_ms) {
 static void completed(void *ctx, const alpha_http_result_t *result) {
     loop_state_t *state = ctx;
     const int index = state->completions++;
-    if (index >= 2) {
+    if (index >= 8) {
         return;
     }
     state->kinds[index] = result->kind;
     state->statuses[index] = result->status_code;
+    state->transports[index] = result->transport_code;
+    state->user_data[index] = result->user_data;
     const size_t copied = result->response_size < sizeof(state->bodies[index]) - 1
                               ? result->response_size
                               : sizeof(state->bodies[index]) - 1;
     memcpy(state->bodies[index], result->response_body, copied);
     state->bodies[index][copied] = '\0';
+}
+
+static void drive_until(alpha_http_multi_t *http, loop_state_t *state, int expected) {
+    int running = 0;
+    TEST_ASSERT_EQUAL_INT(ALPHA_OK, alpha_http_multi_timeout_action(http, &running));
+    for (int attempt = 0; attempt < 100 && state->completions < expected; ++attempt) {
+        if (state->socket_fd < 0) {
+            struct timespec pause = {.tv_sec = 0, .tv_nsec = 1000000L};
+            (void)nanosleep(&pause, NULL);
+            TEST_ASSERT_EQUAL_INT(ALPHA_OK, alpha_http_multi_timeout_action(http, &running));
+            continue;
+        }
+        struct pollfd descriptor = {
+            .fd = state->socket_fd,
+            .events = (short)(((state->watch & ALPHA_HTTP_WATCH_READ) ? POLLIN : 0) |
+                              ((state->watch & ALPHA_HTTP_WATCH_WRITE) ? POLLOUT : 0))};
+        const int timeout =
+            state->timeout_ms >= 0 && state->timeout_ms < 100 ? (int)state->timeout_ms : 100;
+        const int ready_count = poll(&descriptor, 1, timeout);
+        TEST_ASSERT_GREATER_OR_EQUAL_INT(0, ready_count);
+        if (ready_count == 0) {
+            TEST_ASSERT_EQUAL_INT(ALPHA_OK, alpha_http_multi_timeout_action(http, &running));
+            continue;
+        }
+        alpha_http_watch_t ready = ALPHA_HTTP_WATCH_NONE;
+        if ((descriptor.revents & (POLLIN | POLLHUP | POLLERR)) != 0)
+            ready = (alpha_http_watch_t)(ready | ALPHA_HTTP_WATCH_READ);
+        if ((descriptor.revents & POLLOUT) != 0)
+            ready = (alpha_http_watch_t)(ready | ALPHA_HTTP_WATCH_WRITE);
+        TEST_ASSERT_EQUAL_INT(ALPHA_OK,
+                              alpha_http_multi_socket_action(http, descriptor.fd, ready, &running));
+    }
+    TEST_ASSERT_EQUAL_INT(expected, state->completions);
 }
 
 static int make_server(uint16_t *port_out) {
@@ -116,6 +156,39 @@ static int serve_requests(int server) {
             close(client);
             return 11 + index;
         }
+        close(client);
+    }
+    close(server);
+    return 0;
+}
+
+static int serve_failure_matrix(int server) {
+    (void)signal(SIGPIPE, SIG_IGN);
+    for (int index = 0; index < 3; ++index) {
+        const int client = accept(server, NULL, NULL);
+        if (client < 0) {
+            return 20;
+        }
+        char request[2048] = {0};
+        const ssize_t received = read(client, request, sizeof(request) - 1);
+        if (received <= 0) {
+            close(client);
+            return 21;
+        }
+        if (index == 1) {
+            struct timespec pause = {.tv_sec = 0, .tv_nsec = 200000000L};
+            (void)nanosleep(&pause, NULL);
+        }
+        const int status = index == 0 ? 503 : 200;
+        const char *reason = index == 0 ? "Unavailable" : "OK";
+        const char *body = index == 0 ? "{\"error\":true}" : "{\"ok\":true}";
+        char response[256];
+        const int response_size =
+            snprintf(response, sizeof(response),
+                     "HTTP/1.1 %d %s\r\nContent-Type: application/json\r\nContent-Length: %zu\r\n"
+                     "Connection: close\r\n\r\n%s",
+                     status, reason, strlen(body), body);
+        (void)write(client, response, (size_t)response_size);
         close(client);
     }
     close(server);
@@ -221,9 +294,80 @@ static void test_pending_queue_is_bounded(void) {
     alpha_http_global_cleanup();
 }
 
+static void test_failure_matrix_cancel_and_reuse_preserve_identity(void) {
+    uint16_t port = 0;
+    const int server = make_server(&port);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT(0, server);
+    const pid_t child = fork();
+    TEST_ASSERT_NOT_EQUAL(-1, child);
+    if (child == 0) {
+        _exit(serve_failure_matrix(server));
+    }
+    close(server);
+
+    loop_state_t state = {.socket_fd = -1, .timeout_ms = -1};
+    alpha_http_multi_t *http = NULL;
+    TEST_ASSERT_EQUAL_INT(ALPHA_OK, alpha_http_global_init());
+    TEST_ASSERT_EQUAL_INT(
+        ALPHA_OK, alpha_http_multi_create(watch_socket, schedule_timer, completed, &state, &http));
+    char url[128];
+    (void)snprintf(url, sizeof(url), "http://127.0.0.1:%u/failure", (unsigned)port);
+    int ids[] = {101, 102, 103, 104, 105};
+
+    alpha_http_post_t post = {.kind = ALPHA_HTTP_POST_GENERIC_JSON,
+                              .url = url,
+                              .json_body = "{}",
+                              .timeout_ms = 1000,
+                              .user_data = &ids[0]};
+    TEST_ASSERT_EQUAL_INT(ALPHA_OK, alpha_http_post_json(http, &post));
+    drive_until(http, &state, 1);
+    TEST_ASSERT_EQUAL_INT(503, state.statuses[0]);
+    TEST_ASSERT_EQUAL_INT(CURLE_OK, state.transports[0]);
+    TEST_ASSERT_EQUAL_PTR(&ids[0], state.user_data[0]);
+
+    post.timeout_ms = 25;
+    post.user_data = &ids[1];
+    TEST_ASSERT_EQUAL_INT(ALPHA_OK, alpha_http_post_json(http, &post));
+    drive_until(http, &state, 2);
+    TEST_ASSERT_EQUAL_INT(CURLE_OPERATION_TIMEDOUT, state.transports[1]);
+    TEST_ASSERT_EQUAL_PTR(&ids[1], state.user_data[1]);
+
+    post.timeout_ms = 1000;
+    post.user_data = &ids[2];
+    TEST_ASSERT_EQUAL_INT(ALPHA_OK, alpha_http_post_json(http, &post));
+    drive_until(http, &state, 3);
+    TEST_ASSERT_EQUAL_INT(200, state.statuses[2]);
+    TEST_ASSERT_EQUAL_INT(CURLE_OK, state.transports[2]);
+
+    post.user_data = &ids[3];
+    TEST_ASSERT_EQUAL_INT(ALPHA_OK, alpha_http_post_json(http, &post));
+    TEST_ASSERT_EQUAL_INT(ALPHA_OK, alpha_http_cancel(http, &ids[3]));
+    TEST_ASSERT_EQUAL_INT(CURLE_ABORTED_BY_CALLBACK, state.transports[3]);
+    TEST_ASSERT_EQUAL_PTR(&ids[3], state.user_data[3]);
+    TEST_ASSERT_EQUAL_size_t(0, alpha_http_pending(http));
+
+    /* A refused connection completes as transport failure without poisoning the multi handle. */
+    post.url = "http://127.0.0.1:1/refused";
+    post.timeout_ms = 100;
+    post.user_data = &ids[4];
+    TEST_ASSERT_EQUAL_INT(ALPHA_OK, alpha_http_post_json(http, &post));
+    drive_until(http, &state, 5);
+    TEST_ASSERT_NOT_EQUAL(CURLE_OK, state.transports[4]);
+    TEST_ASSERT_EQUAL_PTR(&ids[4], state.user_data[4]);
+    TEST_ASSERT_EQUAL_size_t(0, alpha_http_pending(http));
+
+    alpha_http_multi_destroy(http);
+    alpha_http_global_cleanup();
+    int child_status = 0;
+    TEST_ASSERT_EQUAL_INT(child, waitpid(child, &child_status, 0));
+    TEST_ASSERT_TRUE(WIFEXITED(child_status));
+    TEST_ASSERT_EQUAL_INT(0, WEXITSTATUS(child_status));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_two_generic_json_edges_use_caller_driven_loop);
     RUN_TEST(test_pending_queue_is_bounded);
+    RUN_TEST(test_failure_matrix_cancel_and_reuse_preserve_identity);
     return UNITY_END();
 }
