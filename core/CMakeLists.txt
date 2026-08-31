@@ -123,3 +123,34 @@ set_tests_properties(screener PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 alpha_add_test(test_market_hours)
 add_test(NAME market_hours COMMAND test_market_hours)
 set_tests_properties(market_hours PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+
+# ── Platform I/O drivers (P3) — opt-in so the driverless c-build stays lean ──
+# Enable with -DALPHA_WITH_DRIVERS=ON on a host that has the client libraries
+# (the shared-services CI job). Integration tests skip unless their
+# ALPHA_RUN_*_INTEGRATION env var is set against a live service.
+option(ALPHA_WITH_DRIVERS "Build platform I/O drivers + integration tests" OFF)
+if(ALPHA_WITH_DRIVERS)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(HIREDIS REQUIRED hiredis)
+
+    add_library(alpha_cache STATIC platform/cache/redis_cache.c)
+    target_include_directories(alpha_cache PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+                               ${HIREDIS_INCLUDE_DIRS})
+    target_link_directories(alpha_cache PUBLIC ${HIREDIS_LIBRARY_DIRS})
+    target_link_libraries(alpha_cache PUBLIC alpha::core ${HIREDIS_LIBRARIES})
+    target_compile_options(alpha_cache PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
+    if(ALPHA_ENABLE_SANITIZERS)
+        target_compile_options(alpha_cache PRIVATE -fsanitize=address,undefined
+                               -fno-omit-frame-pointer)
+    endif()
+
+    add_executable(test_redis_cache tests/test_redis_cache.c)
+    target_link_libraries(test_redis_cache PRIVATE alpha_cache unity)
+    target_compile_options(test_redis_cache PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
+    if(ALPHA_ENABLE_SANITIZERS)
+        target_compile_options(test_redis_cache PRIVATE -fsanitize=address,undefined
+                               -fno-omit-frame-pointer)
+        target_link_options(test_redis_cache PRIVATE -fsanitize=address,undefined)
+    endif()
+    add_test(NAME redis_cache COMMAND test_redis_cache)
+endif()
