@@ -92,8 +92,13 @@
   weakest-two, L3 daily breaker, and the max-position gate match the pinned
   Python under dev+bench. L2 weakest-two uses a stable two-pointer selection
   (strict `<`) that reproduces Python's stable sort + `candidates[:2]` on ties.
-- **Risk-gate goldens are transcribed, not live-invoked.** The Python
-  `portfolio_manager` gate methods are async and Postgres-coupled, so
+- **P2 is complete:** market_data, blending, risk gates, sizing, and the screener
+  filter are all parity-gated under dev+bench; blend + risk batch benchmarks are
+  recorded. Screener: `_score_ticker` (volume-surge/change-pct, `>=`, `<5`-bar
+  skip) + passing/score-desc/top-10 stable selection (`core/src/indicators`).
+- **Risk-gate and screener goldens are transcribed, not live-invoked.** The Python
+  `portfolio_manager` gate methods (async/Postgres-coupled) and `screener.py`
+  (imports DB/logging at module load) cannot be imported directly, so
   `tools/generate_golden_decisions.py` contains a Python reference that
   transcribes their pure decision arithmetic line-for-line from the pinned
   source (blend/market_data goldens still import the real Python modules). This is
