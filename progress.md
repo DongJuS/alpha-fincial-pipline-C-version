@@ -33,7 +33,7 @@ benchmarks. Next is P3 nonblocking drivers, up to the MVP-2 GO/NO-GO gate.
 | P0 | Pin Python baseline + harness + C scaffold | ✅ done (hosted CI green) |
 | P1 | C numeric slice + first Python/C benchmark | ✅ done (parity dev+bench, ~179× bench) |
 | P2 | C decision core + parity/performance | ✅ done (decisions+risk+screener; blend/risk benchmarks) |
-| P3 | C drivers against shared infrastructure | 🟨 in progress (calendar + Redis driver; libpq/http next) |
+| P3 | C drivers against shared infrastructure | 🟨 in progress (driver/LWS tests green; C/Rust benchmark adapters pending) |
 | P4 | Pure-C edges + Rust datalake + optional Rust network comparisons | ⬜ not started |
 | P5 | E2E + consolidated comparison report | ⬜ not started |
 
@@ -70,6 +70,16 @@ live shadowing or order activation is not authorized by this project.
 
 ## Documentation completed
 
+- 2026-08-31: **P3 driver recovery + production LWS runtime.** Corrected the
+  Python `hard_stop:lockout:{scope}` key and absolute `EXAT` validation; added
+  bounded typed hiredis async reconnect, bounded curl-multi failure/cancellation
+  handling, and a nonblocking libpq FIFO that drains buffered pipeline boundaries.
+  A reusable bounded runtime adopts duplicate driver descriptors into the exact
+  pinned static LWS loop, preserving driver ownership. Docker integration runs
+  PostgreSQL, Redis, and HTTP concurrently on one service thread. Added the
+  fail-closed 30-trial Python/C/Rust benchmark orchestrator/bootstrap evaluator
+  and a real asyncio/asyncpg/redis baseline adapter; C and Rust adapters and raw
+  results remain pending, so MVP-2 has no decision yet.
 - 2026-08-31: **P3 unit 2 — Redis cache driver (hiredis).** Added
   `core/platform/cache/redis_cache.c` (`alpha/redis_cache.h`): `latest_ticks:{ticker}`
   set/get with the Python TTL (60s, key pattern `redis:cache:latest_ticks:{ticker}`)
@@ -132,10 +142,6 @@ live shadowing or order activation is not authorized by this project.
   `bench/results/20260831/backtest-small-c.json`: C median ≈0.0133 ms vs Python
   2.3716 ms (~179×), peak RSS 1.9 MB vs 29 MB. clang-format/clang-tidy extended
   to the new sources; `.clang-tidy` tuned (four checks disabled, see MEMORY).
-- 2026-08-30: first hosted run `33315962850` exposed three portability defects:
-  Linux `libm` linkage, missing per-job Python checkout, and clang-analyzer
-  rejection of C buffer APIs. Fixes use UNIX `m`, a pinned detached checkout,
-  aggregate initialization, and `PQconnectStartParams`; hosted rerun is pending.
 - 2026-08-30: proved the locked Python `CREATE_TABLES` bootstrap applies twice to
   an empty PostgreSQL 15 service. The gate parses literal SQL from the pinned
   source instead of copying or importing application code, verifies seven
@@ -186,23 +192,9 @@ the libwebsockets-owned loop, against the shared Docker Postgres/Redis. This is
 the run-up to the **MVP-2 driver-I/O GO/NO-GO** gate (`docs/plans/phase-3-drivers.md`).
 
 ## 2026-08-31 — P2 risk benchmark
-
 - Added identical 100,000-snapshot Python/C risk workloads covering stop/take,
   daily loss, and paper/real max-position decisions. All four counts and the
   combined checksum match; the C benchmark is parity-gated before timing.
 - Recorded 10 raw trials: Python median 28.7343 ms and C median 0.4110 ms on this
   host. This is arithmetic-only evidence using the documented transcription,
   not a live-I/O or migration claim.
-
-## 2026-08-31 — P0 contract closure implementation
-
-- Added a Rust 1.91.1 workspace with an empty default and explicit selected
-  S3/Parquet boundary, exact direct pins, lockfile, and locked fmt/test/clippy CI.
-  No P4 adapter behavior or Rust network challenger was implemented early.
-- Replaced distro libwebsockets with exact v4.3.3 commit `4415e84c…`, built
-  static-only with alternate loops disabled. Both CI consumers verify the staged
-  artifact/config; the spike records static-symbol and dynamic-link evidence.
-- The locked schema tool now applies bootstrap plus minute-bar migration SQL and
-  asserts v2 constraints/FKs, exact partitions/indexes, routing, rejection, and
-  catalog idempotence. Local PostgreSQL integration and 33 Python tests passed;
-  hosted branch CI `33345361616` passed all six jobs, closing these P0 gaps.
