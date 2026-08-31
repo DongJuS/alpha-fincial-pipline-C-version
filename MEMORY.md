@@ -120,6 +120,18 @@
   database-coupled. Exact decision counts/checksum must match before C timing is
   eligible; results must not be described as live Python service performance.
 
+## P0 reproducibility pins
+
+- The event-loop dependency is source commit
+  `4415e84c095857629863804e941b9e1c2e9347ef` (libwebsockets v4.3.3), static-only,
+  with libuv/libevent/GLib/evlib and SSL disabled. A distro package is not valid
+  P0 evidence.
+- The Rust boundary is toolchain 1.91.1 with exact direct versions and a checked
+  lockfile. Its default feature is empty; `datalake` selects only Parquet/Arrow
+  encoding plus S3/Tokio storage. Implementation remains a P4 concern.
+- Schema completeness means bootstrap plus both files named in the source lock,
+  followed by catalog, partition-routing, rejection, and repeat-apply checks.
+
 ## Safety invariants
 - MVP-4 validation is an order-disabled deterministic replay shadow. Live shadow
   access, production deployment, and real-order activation require separate approval.

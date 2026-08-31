@@ -30,7 +30,14 @@ def verify(result_path: Path, binary_path: Path) -> None:
         "ldd", str(binary_path)
     ]
     linked = subprocess.run(command, check=True, capture_output=True, text=True).stdout.lower()
-    assert "websockets" in linked
+    # libwebsockets is intentionally a pinned static archive, so it must not
+    # appear in the dynamic dependency graph. Prove it was linked by checking
+    # for a public LWS symbol in the final executable instead.
+    symbols = subprocess.run(
+        ["nm", str(binary_path)], check=True, capture_output=True, text=True
+    ).stdout
+    assert "lws_create_context" in symbols
+    assert "websockets" not in linked
     assert "libuv" not in linked
     assert "libevent" not in linked
 

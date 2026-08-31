@@ -74,17 +74,42 @@ jobs:
           core/src/market_data/market_data.c core/src/portfolio/blending.c
           core/src/portfolio/sizing.c core/src/risk/gates.c
           core/apps/backtest_fixture.c core/apps/backtest_runner.c
-          core/apps/blend_runner.c
+          core/apps/blend_runner.c core/apps/risk_runner.c
           --warnings-as-errors=*
           --header-filter='core/(include|src|apps)/.*'
       - name: Configure and lint event-loop spike
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebsockets-dev libpq-dev libhiredis-dev libcurl4-openssl-dev pkg-config
-          cmake -S spike/event_loop -B build/event-loop -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          sudo apt-get install -y libpq-dev libhiredis-dev libcurl4-openssl-dev pkg-config
+          tools/build_pinned_libwebsockets.sh
+          cmake -S spike/event_loop -B build/event-loop \
+            -DALPHA_LWS_PREFIX="$PWD/build/deps/libwebsockets/install" \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
           clang-tidy -p build/event-loop spike/event_loop/main.c \
             --checks='-*,clang-analyzer-*,bugprone-*,performance-*,portability-*,-bugprone-easily-swappable-parameters,-bugprone-signed-bitwise,-performance-no-int-to-ptr' \
             --warnings-as-errors=*
+
+  rust-boundary:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: edge
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain
+      - name: Verify locked workspace metadata
+        run: cargo metadata --locked --format-version 1 --no-deps
+      - name: Build selected datalake boundary
+        run: cargo build --workspace --all-features --locked
+      - name: Test default and selected feature boundaries
+        run: |
+          cargo test --workspace --locked
+          cargo test --workspace --all-features --locked
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
   shared-services:
     runs-on: ubuntu-latest
@@ -106,8 +131,10 @@ jobs:
       - name: Install single-loop spike dependencies
         run: >-
           sudo apt-get update && sudo apt-get install -y
-          libwebsockets-dev libpq-dev postgresql-client libhiredis-dev
+          libpq-dev postgresql-client libhiredis-dev
           libcurl4-openssl-dev pkg-config
+      - name: Build and verify pinned single-loop dependency
+        run: tools/build_pinned_libwebsockets.sh
       - name: Apply pinned Python schema twice
         env:
           ALPHA_RUN_SCHEMA_APPLY: "1"

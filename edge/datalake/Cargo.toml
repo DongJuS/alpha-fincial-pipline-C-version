@@ -1,0 +1,19 @@
+[package]
+name = "alpha-datalake"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[features]
+default = []
+datalake = ["parquet-encoding", "s3-storage"]
+parquet-encoding = ["dep:arrow", "dep:parquet"]
+s3-storage = ["dep:aws-config", "dep:aws-sdk-s3", "dep:tokio"]
+
+[dependencies]
+arrow = { workspace = true, optional = true }
+aws-config = { workspace = true, optional = true, features = ["behavior-version-latest", "rt-tokio"] }
+aws-sdk-s3 = { workspace = true, optional = true, features = ["rt-tokio", "rustls"] }
+parquet = { workspace = true, optional = true, features = ["arrow", "zstd"] }
+tokio = { workspace = true, optional = true, features = ["rt-multi-thread"] }
