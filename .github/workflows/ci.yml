@@ -148,15 +148,18 @@ jobs:
         env:
           ALPHA_RUN_REDIS_INTEGRATION: "1"
           ALPHA_RUN_POSTGRES_INTEGRATION: "1"
+          ALPHA_RUN_LWS_DRIVER_INTEGRATION: "1"
         run: |
           cmake -S . -B build/drivers -DALPHA_WITH_DRIVERS=ON -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
           cmake --build build/drivers --parallel
-          ctest --test-dir build/drivers -R 'redis_cache|postgres|http_client' --output-on-failure
+          ctest --test-dir build/drivers \
+            -R 'redis_cache|postgres|http_client|lws_runtime|lws_drivers' --output-on-failure
           clang-tidy -p build/drivers \
             core/platform/cache/redis_cache.c core/platform/cache/redis_async.c \
             core/platform/db/postgres.c \
-            core/platform/http/http_client.c --warnings-as-errors='*' \
+            core/platform/http/http_client.c core/platform/event/lws_runtime.c \
+            --warnings-as-errors='*' \
             --header-filter='core/(include|platform)/.*'
       - name: Stop shared services
         if: always()
