@@ -158,3 +158,16 @@ P2 screener contract and enter P3 only after P0 evidence is complete.
 - Recorded 10 raw trials: Python median 28.7343 ms and C median 0.4110 ms on this
   host. This is arithmetic-only evidence using the documented transcription,
   not a live-I/O or migration claim.
+
+## 2026-08-31 — P0 contract closure implementation
+
+- Added a Rust 1.91.1 workspace with an empty default and explicit selected
+  S3/Parquet boundary, exact direct pins, lockfile, and locked fmt/test/clippy CI.
+  No P4 adapter behavior or Rust network challenger was implemented early.
+- Replaced distro libwebsockets with exact v4.3.3 commit `4415e84c…`, built
+  static-only with alternate loops disabled. Both CI consumers verify the staged
+  artifact/config; the spike records static-symbol and dynamic-link evidence.
+- The locked schema tool now applies bootstrap plus minute-bar migration SQL and
+  asserts v2 constraints/FKs, exact partitions/indexes, routing, rejection, and
+  catalog idempotence. Local PostgreSQL integration and 33 Python tests passed;
+  hosted branch CI `33345361616` passed all six jobs, closing these P0 gaps.

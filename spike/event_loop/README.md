@@ -5,6 +5,13 @@ single libwebsockets service thread schedules readiness probes with zero timeout
 all libpq, hiredis, and curl operations remain nonblocking. There is no worker
 thread and no libuv/libevent adapter.
 
+`run.sh` verifies and incrementally builds the exact revision and options in
+`third_party/libwebsockets.lock.json`.
+Set `ALPHA_LWS_PREFIX` only to reuse a stage produced by
+`tools/build_pinned_libwebsockets.sh`; CMake intentionally rejects an unpinned
+system installation. libuv, libevent, GLib, and event-library plugins are all
+disabled, and the verifier rejects shared libwebsockets output.
+
 The run proves a PostgreSQL round trip, pipeline abort/sync/reuse, a Redis round
 trip followed by disconnect/reconnect, and a curl-multi request. It also exercises
 a four-entry caller-owned queue, deterministic saturation rejection, cancellation,

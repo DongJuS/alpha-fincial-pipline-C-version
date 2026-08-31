@@ -1,0 +1,14 @@
+[workspace]
+members = ["datalake"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.91.1"
+
+[workspace.dependencies]
+arrow = { version = "=54.3.1", default-features = false }
+aws-config = { version = "=1.5.17", default-features = false }
+aws-sdk-s3 = { version = "=1.78.0", default-features = false }
+parquet = { version = "=54.3.1", default-features = false }
+tokio = { version = "=1.43.0", default-features = false }
