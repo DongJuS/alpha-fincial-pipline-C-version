@@ -94,6 +94,12 @@ class DriverBenchmarkTest(unittest.TestCase):
             run.execute(FIXTURE, ADAPTERS, dirty, 30)
 
     @mock.patch.object(run, "run_adapter")
+    def test_smoke_allows_one_strict_trial_per_cell(self, adapter):
+        adapter.side_effect = self.adapter
+        records = run.execute(FIXTURE, ADAPTERS, SOURCES, 1, minimum_trials=1)
+        self.assertEqual(2 * 3 * 3, len(records))
+
+    @mock.patch.object(run, "run_adapter")
     def test_fails_closed_on_parity_errors_and_completed_id_order(self, adapter):
         def mismatch(*args):
             value = self.adapter(*args)

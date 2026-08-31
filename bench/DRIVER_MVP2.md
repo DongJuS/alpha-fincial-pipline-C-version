@@ -61,3 +61,8 @@ derived operation-throughput samples.
 CPU/RSS ratios stay within the supplied limits (default: no regression).
 
 No adapter means no result: the harness never substitutes synthetic timings.
+
+Before the controlled 30-trial run, pass `--smoke --trials 1` with the same
+adapter and source arguments. This executes all 18 variant/case/concurrency
+cells against real services and writes `smoke.json`, but deliberately emits no
+performance result or gate decision.

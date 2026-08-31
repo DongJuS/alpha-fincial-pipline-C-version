@@ -134,9 +134,10 @@ def run_adapter(command: str, fixture: Path, case: str, concurrency: int, trial:
 def execute(
     fixture: Path, adapters: dict[str, str], sources: dict[str, str], trials: int,
     attestations: dict[str, dict[str, str]] | None = None,
+    *, minimum_trials: int = 30,
 ) -> list[dict]:
-    if trials < 30:
-        raise ValueError("MVP-2 requires at least 30 trials")
+    if trials < minimum_trials:
+        raise ValueError(f"MVP-2 requires at least {minimum_trials} trials")
     variants = list(adapters)
     if variants != ["python", "c", "rust"]:
         raise ValueError("adapters must be supplied once and in python,c,rust order")
@@ -276,15 +277,43 @@ def main() -> int:
     parser.add_argument("--adapter", action="append", default=[], help="python|c|rust=COMMAND")
     parser.add_argument("--source", action="append", default=[], help="VARIANT=GIT_WORKTREE")
     parser.add_argument("--trials", type=int, default=30)
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="run one parity trial per cell without producing benchmark results",
+    )
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
     adapters = parse_assignments(args.adapter, "adapter")
     source_paths = parse_assignments(args.source, "source")
     sources = {variant: inspect_source(path) for variant, path in source_paths.items()}
     attestations = {variant: adapter_attestation(command) for variant, command in adapters.items()}
-    records = execute(args.fixture, adapters, sources, args.trials, attestations)
-    results = build_results(records, args.fixture, sources)
+    if args.smoke and args.trials != 1:
+        parser.error("--smoke requires --trials 1")
+    records = execute(
+        args.fixture, adapters, sources, args.trials, attestations,
+        minimum_trials=1 if args.smoke else 30,
+    )
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    if args.smoke:
+        evidence = {
+            "mode": "smoke",
+            "fixture_sha256": sha256_file(args.fixture),
+            "cells": [
+                {
+                    "case": record["case"],
+                    "concurrency": record["concurrency"],
+                    "variant": record["variant"],
+                    "result_sha256": record["adapter"]["result_sha256"],
+                    "completed_count": len(record["adapter"]["completed_tokens"]),
+                    "latency_sample_count": len(record["adapter"]["operation_latency_ns"]),
+                    "attestation": record["attestation"],
+                }
+                for record in records
+            ],
+        }
+        (args.output_dir / "smoke.json").write_bytes(canonical(evidence))
+        return 0
+    results = build_results(records, args.fixture, sources)
     for result in results:
         path = args.output_dir / f"{result['case']}-c{result['workload']['concurrency']}-{result['variant']}.json"
         path.write_bytes(canonical(result))
