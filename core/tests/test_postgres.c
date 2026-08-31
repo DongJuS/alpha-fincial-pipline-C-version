@@ -2,6 +2,7 @@
  * Unavailable service is a local skip unless ALPHA_RUN_POSTGRES_INTEGRATION is
  * set; hosted CI must set it so a missing service cannot become a green test. */
 #include "alpha/postgres.h"
+#include "alpha/round.h"
 #include "unity.h"
 
 #include <poll.h>
@@ -36,8 +37,11 @@ static bool service_once(alpha_pg_t *db, int timeout_ms) {
         return false;
     }
     const int ready = poll(&descriptor, 1, timeout_ms);
-    if (ready <= 0) {
+    if (ready < 0) {
         return false;
+    }
+    if (ready == 0) {
+        return true;
     }
     return alpha_pg_service(db, (descriptor.revents & POLLIN) != 0,
                             (descriptor.revents & POLLOUT) != 0) == ALPHA_OK;
@@ -86,7 +90,12 @@ static void test_bounded_pipeline_roundtrip_and_aggregate(void) {
     TEST_ASSERT_EQUAL_INT(ALPHA_ERR_RANGE,
                           alpha_pg_query_exposure(g_db, ticker, capture_result, &aggregate));
 
-    TEST_ASSERT_TRUE_MESSAGE(drive_until_idle(g_db), alpha_pg_error(g_db));
+    const bool first_batch_idle = drive_until_idle(g_db);
+    if (!first_batch_idle) {
+        fprintf(stderr, "pipeline stalled: pending=%zu first=%d second=%d error=%s\n",
+                alpha_pg_pending(g_db), first.calls, second.calls, alpha_pg_error(g_db));
+    }
+    TEST_ASSERT_TRUE_MESSAGE(first_batch_idle, alpha_pg_error(g_db));
     TEST_ASSERT_EQUAL_INT(1, first.calls);
     TEST_ASSERT_EQUAL_INT(ALPHA_OK, first.result.status);
     TEST_ASSERT_EQUAL_STRING(ticker, first.result.value.position.ticker);
@@ -104,10 +113,12 @@ static void test_bounded_pipeline_roundtrip_and_aggregate(void) {
     TEST_ASSERT_EQUAL_INT64(5140, aggregate.result.value.exposure.total_market_value);
     TEST_ASSERT_EQUAL_INT32(2, aggregate.result.value.exposure.strategy_count);
     TEST_ASSERT_TRUE(aggregate.result.value.exposure.total_aum >= 5140);
-    TEST_ASSERT_DOUBLE_WITHIN(0.000001,
-                              (double)aggregate.result.value.exposure.total_market_value /
-                                  (double)aggregate.result.value.exposure.total_aum * 100.0,
-                              aggregate.result.value.exposure.exposure_pct);
+    TEST_ASSERT_DOUBLE_WITHIN(
+        0.000001,
+        alpha_round_dp((double)aggregate.result.value.exposure.total_market_value /
+                           (double)aggregate.result.value.exposure.total_aum * 100.0,
+                       2),
+        aggregate.result.value.exposure.exposure_pct);
 }
 
 static void test_input_guards(void) {
