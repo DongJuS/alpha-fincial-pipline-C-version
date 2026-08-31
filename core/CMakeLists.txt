@@ -54,6 +54,10 @@ add_executable(blend_runner apps/blend_runner.c)
 target_link_libraries(blend_runner PRIVATE alpha::core)
 target_compile_options(blend_runner PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
 target_compile_definitions(blend_runner PRIVATE _DEFAULT_SOURCE)
+add_executable(risk_runner apps/risk_runner.c)
+target_link_libraries(risk_runner PRIVATE alpha::core)
+target_compile_options(risk_runner PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
+target_compile_definitions(risk_runner PRIVATE _DEFAULT_SOURCE)
 if(ALPHA_ENABLE_SANITIZERS)
     target_compile_options(backtest_runner PRIVATE -fsanitize=address,undefined
                            -fno-omit-frame-pointer)
@@ -61,6 +65,9 @@ if(ALPHA_ENABLE_SANITIZERS)
     target_compile_options(blend_runner PRIVATE -fsanitize=address,undefined
                            -fno-omit-frame-pointer)
     target_link_options(blend_runner PRIVATE -fsanitize=address,undefined)
+    target_compile_options(risk_runner PRIVATE -fsanitize=address,undefined
+                           -fno-omit-frame-pointer)
+    target_link_options(risk_runner PRIVATE -fsanitize=address,undefined)
 endif()
 
 add_library(unity STATIC ${PROJECT_SOURCE_DIR}/third_party/unity/unity.c)
