@@ -1,5 +1,14 @@
 {
   "format_version": 1,
+  "contract": {
+    "pipeline_depth": 1,
+    "queue_depth": 1,
+    "retry_policy": "none",
+    "saturation_policy": "bounded_wait",
+    "service_config": {"postgres":{"database":"alpha_test","host":"127.0.0.1","port":55432},"redis":{"database":0,"host":"127.0.0.1","port":56379}},
+    "service_config_sha256": "4488f369855df1a2061117ae51a86c053df51f923c3b8ce0c4a82a59a24e2372",
+    "schema_sha256": "af9dfa09fd49d9ae8db0d59d4d8e266256bbe75b7af90de18e4affdae35adf91"
+  },
   "cases": {
     "redis-hot-path": {
       "operations": [
@@ -9,7 +18,9 @@
       ],
       "repeat": 1000,
       "connection_count": 1,
-      "pipeline_depth": 32,
+      "pipeline_depth": 1,
+      "terminal": [{"id":"r001","stored":"{\"price\":70000,\"volume\":10}"},{"id":"r002","ttl_positive":true},{"id":"r003","locked":false}],
+      "terminal_sha256": "e2c7ca827491db79926ca9e8c9fcb71ee5ceba381e1d71db487b188871d9f469",
       "timeout_ms": 5000
     },
     "db-read-write": {
@@ -20,7 +31,9 @@
       ],
       "repeat": 1000,
       "connection_count": 1,
-      "pipeline_depth": 32,
+      "pipeline_depth": 1,
+      "terminal": [{"id":"d001","strategy_id":"strategy-a","quantity":10,"current_price":1000},{"id":"d002","strategy_id":"strategy-b","quantity":20,"current_price":1200},{"id":"d003","total_quantity":30,"total_market_value":34000}],
+      "terminal_sha256": "5915ad424a76bbcd914bf47d7d06d124a88530d08499e32ae0705579f003bd14",
       "timeout_ms": 5000
     }
   }
