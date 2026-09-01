@@ -87,11 +87,18 @@ Fixture checksums and expected golden-output checksums belong in
    separate configurations, not interchangeable language samples.
 5. Warm up until steady state, then run at least 10 measured trials. Each trial
    must be long enough to exceed timer noise (target ≥1 second for micro-batches).
+   MVP-2 treats this target as a hard floor: every measured variant/cell/trial
+   must report at least 1,000 ms or the matrix aborts. Smoke runs are correctness
+   checks and are explicitly exempt from the duration floor.
 6. Report median, p95, min/max, standard deviation, sample count, and raw samples.
    Report speedup as `python_median / candidate_median` with units and direction.
 7. Abort or mark invalid on parity failure, dropped work, unexpected retry, service
    throttling, thermal throttling, or material background-load interference.
 8. Never time Debug/ASan C against release Python and call it a language result.
+9. Capture stable host identity (kernel, CPU model/count, RAM and runner image)
+   once for the matrix and require build/configuration invariants within every
+   cell. Re-hash clean sources, adapter commands, and exact artifacts after the
+   final trial; any mid-run drift invalidates the matrix.
 
 ## 6. Correctness rules
 
