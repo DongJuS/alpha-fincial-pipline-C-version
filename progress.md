@@ -71,11 +71,13 @@ live shadowing or order activation is not authorized by this project.
 
 ## Documentation completed
 
-- 2026-09-01: **MVP-2 native adapter smoke.** Real Python, C (pinned LWS/libpq/
-  hiredis), and Rust (Tokio/SQLx/fred) emit 3,000 completion/latency samples,
-  namespaced state, terminal goldens, and strict attestations at truthful depth 1.
-  Hosted Linux CI `33459011368` passed all 18 real-service smoke cells. This is
-  parity/readiness evidence only; no benchmark decision is recorded.
+- 2026-09-01: **MVP-2 controlled protocol ready.** Python/C/Rust adapters use
+  namespaced state, terminal goldens, truthful depth 1, and 21k Redis/9k PG
+  operations. The evaluator now rejects forged, drifting, cross-host, short,
+  incomplete, or non-finite evidence and recomputes resources/tail latency.
+  CI `33461113374` passed all 18 real-service smoke cells. The authoritative
+  workflow requires an `alpha-bench` self-hosted Linux runner; none is registered,
+  so the 30-trial gate has not run and MVP-2 has no decision.
 - 2026-08-31: **P3 driver recovery + production LWS runtime.** Corrected the
   Python `hard_stop:lockout:{scope}` key and absolute `EXAT` validation; added
   bounded typed hiredis async reconnect, bounded curl-multi failure/cancellation

@@ -16,7 +16,7 @@
         {"id": "r002", "op": "get_latest_tick", "ticker": "005930", "expected": "{\"price\":70000,\"volume\":10}"},
         {"id": "r003", "op": "breaker_check", "scope": "paper", "expected": false}
       ],
-      "repeat": 1000,
+      "repeat": 7000,
       "connection_count": 1,
       "pipeline_depth": 1,
       "terminal": [{"id":"r001","stored":"{\"price\":70000,\"volume\":10}"},{"id":"r002","ttl_positive":true},{"id":"r003","locked":false}],
@@ -29,7 +29,7 @@
         {"id": "d002", "op": "upsert_position", "ticker": "MVP2A", "strategy_id": "strategy-b", "account_scope": "paper", "quantity": 20, "current_price": 1200},
         {"id": "d003", "op": "read_exposure", "ticker": "MVP2A", "expected": {"total_quantity": 30, "total_market_value": 34000}}
       ],
-      "repeat": 1000,
+      "repeat": 3000,
       "connection_count": 1,
       "pipeline_depth": 1,
       "terminal": [{"id":"d001","strategy_id":"strategy-a","quantity":10,"current_price":1000},{"id":"d002","strategy_id":"strategy-b","quantity":20,"current_price":1200},{"id":"d003","total_quantity":30,"total_market_value":34000}],
