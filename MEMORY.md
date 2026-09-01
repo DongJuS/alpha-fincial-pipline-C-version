@@ -131,10 +131,12 @@
   use the bounded typed hiredis async path on the pinned LWS runtime.
 - MVP-2 reports pipeline/queue depth 1 because all three single-connection
   adapters execute serial commands. Every eligible run requires a trial
-  namespace, 3,000 ordered completion/latency samples, committed terminal
+  namespace, all ordered completion/latency samples, committed terminal
   equality, artifact/source attestation, and service/schema/dependency hashes.
-  The hosted 18-cell smoke proves parity only; only the committed 30-trial matrix
-  may decide GO/NO-GO.
+  Measured trials below 1 second are invalid. Hosted runners prove parity only;
+  the 30-trial decision requires one dedicated `self-hosted,linux,x64,alpha-bench`
+  runner. If none is registered, the gate stays pending rather than becoming
+  synthetic GO/NO-GO evidence.
 
 ## Toolchain / lint
 - Project `.clang-tidy` disables four checks project-wide with rationale:
