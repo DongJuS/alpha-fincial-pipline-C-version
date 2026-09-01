@@ -49,7 +49,7 @@ class DriverBenchmarkTest(unittest.TestCase):
             "dropped": 0,
             "configuration": {
                 "concurrency": concurrency,
-                "operation_count": len(operations) * 1000,
+                "operation_count": len(operations) * case_data["repeat"],
                 "pipeline_depth": 1,
                 "timeout_ms": 5000,
                 "event_loop_mode": {"py": "asyncio", "c": "lws", "rust": "tokio"}[command],
@@ -166,15 +166,30 @@ class DriverBenchmarkTest(unittest.TestCase):
             for case in run.CASES:
                 for concurrency in run.CONCURRENCIES:
                     for variant, samples in (("python", [10.0] * 30), ("c", [5.0] * 30)):
+                        rss = 100 if variant == "python" else 80
+                        cpu = 10.0 if variant == "python" else 8.0
                         doc = {
                             "case": case, "variant": variant, "eligible": True,
-                            "parity": {"passed": True}, "source": {"dirty": False},
-                            "workload": {"concurrency": concurrency, "fixture_sha256": "same"},
+                            "parity": {"passed": True, "golden_sha256": "same",
+                                       "result_sha256": f"result-{case}"},
+                            "source": {"commit": f"{variant}-sha", "dirty": False,
+                                       "adapter": {"artifact": f"{variant}-adapter",
+                                                   "command_sha256": "a" * 64,
+                                                   "artifact_sha256": "b" * 64}},
+                            "environment": {"host_id": "linux-host", "cpu": "x86_64", "os": "Linux"},
+                            "build": {"runtime": variant, "compiler": "pinned", "flags": "release",
+                                      "dependencies": {"driver": "pinned"}},
+                            "workload": {"concurrency": concurrency, "fixture_sha256": "same",
+                                         "trials": 30, "rotation": "latin-3",
+                                         "configuration": {"operation_count": 2,
+                                                           "concurrency": concurrency}},
                             "samples_ms": samples, "errors": {"count": 0, "dropped": 0},
-                            "resources": {
-                                "peak_rss_bytes": 100 if variant == "python" else 80,
-                                "cpu_time_ms": 100 if variant == "python" else 80,
-                            },
+                            "trial_order_index": ({"python": [0, 2, 1],
+                                                   "c": [1, 0, 2]}[variant] * 10),
+                            "operation_latency_ns_samples": [[1, 2] for _ in range(30)],
+                            "resource_samples": [{"peak_rss_bytes": rss,
+                                                  "cpu_time_ms": cpu} for _ in range(30)],
+                            "resources": {"peak_rss_bytes": rss, "cpu_time_ms": cpu * 30},
                         }
                         path = Path(tmp) / f"{case}-{concurrency}-{variant}.json"
                         path.write_text(json.dumps(doc))
@@ -183,9 +198,90 @@ class DriverBenchmarkTest(unittest.TestCase):
             last = json.loads(docs[-1].read_text())
             last["resources"]["peak_rss_bytes"] = 101
             docs[-1].write_text(json.dumps(last))
+            with self.assertRaisesRegex(ValueError, "aggregate"):
+                gate.evaluate(docs, "c")
+            last["resource_samples"][0]["peak_rss_bytes"] = 101
+            docs[-1].write_text(json.dumps(last))
             self.assertEqual("NO-GO", gate.evaluate(docs, "c")["decision"])
             docs.pop()
-            with self.assertRaisesRegex(ValueError, "missing result"):
+            with self.assertRaisesRegex(ValueError, "missing or unexpected"):
+                gate.evaluate(docs, "c")
+
+    def _gate_docs(self, directory):
+        paths = []
+        for case in run.CASES:
+            for concurrency in run.CONCURRENCIES:
+                for variant in ("python", "c"):
+                    rss, cpu = ((100, 10.0) if variant == "python" else (80, 8.0))
+                    doc = {
+                        "case": case, "variant": variant, "eligible": True,
+                        "parity": {"passed": True, "golden_sha256": "fixture",
+                                   "result_sha256": f"golden-{case}"},
+                        "source": {"commit": f"{variant}-sha", "dirty": False,
+                                   "adapter": {"artifact": variant, "command_sha256": "a" * 64,
+                                               "artifact_sha256": "b" * 64}},
+                        "environment": {"host": "one"},
+                        "build": {"runtime": variant, "compiler": "pinned", "flags": "release",
+                                  "dependencies": {"driver": "pinned"}},
+                        "workload": {"concurrency": concurrency, "fixture_sha256": "fixture",
+                                     "trials": 30, "rotation": "latin-3",
+                                     "configuration": {"operation_count": 3,
+                                                       "concurrency": concurrency}},
+                        "samples_ms": [10.0 if variant == "python" else 5.0] * 30,
+                        "trial_order_index": ({"python": [0, 2, 1], "c": [1, 0, 2]}[variant] * 10),
+                        "resource_samples": [{"peak_rss_bytes": rss, "cpu_time_ms": cpu}] * 30,
+                        "resources": {"peak_rss_bytes": rss, "cpu_time_ms": cpu * 30},
+                        "operation_latency_ns_samples": [[1, 2, 3]] * 30,
+                        "errors": {"count": 0, "dropped": 0},
+                    }
+                    path = Path(directory) / f"{case}-{concurrency}-{variant}.json"
+                    path.write_text(json.dumps(doc))
+                    paths.append(path)
+        return paths
+
+    def test_gate_fails_closed_on_duplicate_trial_and_attestation_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            docs = self._gate_docs(tmp)
+            with self.assertRaisesRegex(ValueError, "duplicate"):
+                gate.evaluate(docs + [docs[0]], "c")
+            mutations = (
+                ("trials", lambda doc: doc["workload"].update({"trials": 29}), "exactly 30"),
+                ("samples", lambda doc: doc["samples_ms"].pop(), "exactly 30"),
+                ("rotation", lambda doc: doc["trial_order_index"].reverse(), "Latin-3"),
+                ("host", lambda doc: doc.update({"environment": {"host": "other"}}), "same environment"),
+                ("build", lambda doc: doc["build"].update({"runtime": "changed"}), "build attestation drift"),
+                ("source", lambda doc: doc["source"]["adapter"].update({"artifact_sha256": "bad"}),
+                 "attestation digest"),
+                ("golden", lambda doc: doc["parity"].update({"golden_sha256": "other"}),
+                 "fixture/golden"),
+            )
+            original = docs[-1].read_text()
+            for _name, mutate, message in mutations:
+                value = json.loads(original)
+                mutate(value)
+                docs[-1].write_text(json.dumps(value))
+                with self.assertRaisesRegex(ValueError, message):
+                    gate.evaluate(docs, "c")
+            docs[-1].write_text(original)
+
+    def test_gate_recomputes_resources_and_operation_latency_summaries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            docs = self._gate_docs(tmp)
+            report = gate.evaluate(docs, "c")
+            latency = report["comparisons"][0]["operation_latency"]
+            self.assertEqual(2.98, latency["python"]["p99_summary_ns"]["median"])
+
+            value = json.loads(docs[0].read_text())
+            value["resource_samples"][0]["cpu_time_ms"] = float("inf")
+            docs[0].write_text(json.dumps(value))
+            with self.assertRaisesRegex(ValueError, "non-finite"):
+                gate.evaluate(docs, "c")
+
+            docs = self._gate_docs(tmp)
+            value = json.loads(docs[0].read_text())
+            value["operation_latency_ns_samples"][0][0] = True
+            docs[0].write_text(json.dumps(value))
+            with self.assertRaisesRegex(ValueError, "latency trial"):
                 gate.evaluate(docs, "c")
 
 
