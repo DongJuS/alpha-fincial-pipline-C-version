@@ -154,6 +154,12 @@ bool alpha_pg_wants_write(const alpha_pg_t *db) {
 
 size_t alpha_pg_pending(const alpha_pg_t *db) { return db != NULL ? db->count : 0; }
 size_t alpha_pg_capacity(const alpha_pg_t *db) { return db != NULL ? db->capacity : 0; }
+bool alpha_pg_is_idle(const alpha_pg_t *db) {
+    if (db == NULL || db->count != 0 || db->sync_sent || db->flush_pending) {
+        return false;
+    }
+    return true;
+}
 const char *alpha_pg_error(const alpha_pg_t *db) { return db != NULL ? db->error : "invalid db"; }
 
 static void complete_head(alpha_pg_t *db, alpha_pg_result_t *result) {

@@ -32,27 +32,38 @@ class DriverBenchmarkTest(unittest.TestCase):
             run.sha256_file(FIXTURE), manifest["fixtures"]["driver-workloads"]["sha256"]
         )
 
-    def adapter(self, command, fixture, case, concurrency, trial):
-        operations = json.loads(fixture.read_bytes())["cases"][case]["operations"]
+    def adapter(self, command, fixture, case, concurrency, trial, namespace):
+        data = json.loads(fixture.read_bytes())
+        case_data = data["cases"][case]
+        operations = case_data["operations"]
+        tokens = [f"{iteration:06d}:{operation['id']}" for iteration in range(case_data["repeat"])
+                  for operation in operations]
         return {
             "elapsed_ms": {"py": 10.0, "c": 5.0, "rust": 4.0}[command],
             "fixture_sha256": run.sha256_file(fixture),
-            "completed_ids": [op["id"] for op in operations],
-            "result_sha256": f"parity-{case}",
+            "completed_tokens": tokens,
+            "operation_latency_ns": [1] * len(tokens),
+            "terminal": case_data["terminal"],
+            "result_sha256": case_data["terminal_sha256"],
             "errors": 0,
             "dropped": 0,
             "configuration": {
                 "concurrency": concurrency,
                 "operation_count": len(operations) * 1000,
-                "pipeline_depth": 32,
+                "pipeline_depth": 1,
                 "timeout_ms": 5000,
-                "event_loop_mode": "test-loop",
+                "event_loop_mode": {"py": "asyncio", "c": "lws", "rust": "tokio"}[command],
                 "worker_count": 1,
-                "queue_depth": 32,
+                "queue_depth": 1,
                 "connection_count": 1,
+                "retry_policy": "none",
+                "saturation_policy": "bounded_wait",
+                "service_config_sha256": data["contract"]["service_config_sha256"],
+                "schema_sha256": data["contract"]["schema_sha256"],
             },
             "resources": {"peak_rss_bytes": 100, "cpu_time_ms": 1.0},
-            "build": {"runtime": command, "flags": "test"},
+            "build": {"runtime": command, "compiler": "test", "flags": "test",
+                      "dependencies": {"driver": "1"}},
         }
 
     @mock.patch.object(run, "run_adapter")
@@ -83,15 +94,21 @@ class DriverBenchmarkTest(unittest.TestCase):
             run.execute(FIXTURE, ADAPTERS, dirty, 30)
 
     @mock.patch.object(run, "run_adapter")
+    def test_smoke_allows_one_strict_trial_per_cell(self, adapter):
+        adapter.side_effect = self.adapter
+        records = run.execute(FIXTURE, ADAPTERS, SOURCES, 1, minimum_trials=1)
+        self.assertEqual(2 * 3 * 3, len(records))
+
+    @mock.patch.object(run, "run_adapter")
     def test_fails_closed_on_parity_errors_and_completed_id_order(self, adapter):
         def mismatch(*args):
             value = self.adapter(*args)
             if args[0] == "c":
-                value["result_sha256"] = "different"
+                value["result_sha256"] = "0" * 64
             return value
 
         adapter.side_effect = mismatch
-        with self.assertRaisesRegex(ValueError, "parity mismatch"):
+        with self.assertRaisesRegex(ValueError, "committed golden"):
             run.execute(FIXTURE, ADAPTERS, SOURCES, 30)
 
         def dropped(*args):
@@ -105,12 +122,38 @@ class DriverBenchmarkTest(unittest.TestCase):
 
         def reordered(*args):
             value = self.adapter(*args)
-            value["completed_ids"].reverse()
+            value["completed_tokens"].reverse()
             return value
 
         adapter.side_effect = reordered
-        with self.assertRaisesRegex(ValueError, "completed IDs"):
+        with self.assertRaisesRegex(ValueError, "completion tokens"):
             run.execute(FIXTURE, ADAPTERS, SOURCES, 30)
+
+    @mock.patch.object(run, "run_adapter")
+    def test_fails_closed_on_golden_config_latency_and_dependency_drift(self, adapter):
+        mutations = (
+            ("terminal", lambda value: value["terminal"].append({"wrong": True}), "committed golden"),
+            ("latency", lambda value: value["operation_latency_ns"].pop(), "latency samples"),
+            ("config", lambda value: value["configuration"].update({"pipeline_depth": 32}), "configuration mismatch"),
+            ("loop", lambda value: value["configuration"].update({"event_loop_mode": "poll"}), "event_loop_mode"),
+            ("deps", lambda value: value["build"].update({"dependencies": {}}), "dependency metadata"),
+        )
+        for _name, mutate, message in mutations:
+            def invalid(*args, mutate=mutate):
+                value = self.adapter(*args)
+                mutate(value)
+                return value
+            adapter.side_effect = invalid
+            with self.assertRaisesRegex(ValueError, message):
+                run.execute(FIXTURE, ADAPTERS, SOURCES, 30)
+
+    def test_adapter_attestation_hashes_command_and_measured_file(self):
+        command = f"python3 {ROOT / 'bench/adapters/python_driver.py'}"
+        first = run.adapter_attestation(command)
+        second = run.adapter_attestation(command)
+        self.assertEqual(first, second)
+        self.assertEqual(run.sha256_file(ROOT / "bench/adapters/python_driver.py"),
+                         first["artifact_sha256"])
 
     def test_bootstrap_is_deterministic_and_gate_requires_every_cell(self):
         first = gate.bootstrap_speedup([10.0] * 30, [5.0] * 30)

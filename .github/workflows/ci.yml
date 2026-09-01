@@ -161,6 +161,19 @@ jobs:
             core/platform/http/http_client.c core/platform/event/lws_runtime.c \
             --warnings-as-errors='*' \
             --header-filter='core/(include|platform)/.*'
+      - name: Verify real Python C and Rust MVP-2 parity smoke
+        run: |
+          python -m pip install 'asyncpg==0.31.0' 'redis==5.3.1'
+          cargo build --manifest-path edge/Cargo.toml --package alpha-driver-bench \
+            --release --locked
+          python bench/run_driver_mvp2.py --smoke --trials 1 \
+            --adapter 'python=python bench/adapters/python_driver.py' \
+            --adapter 'c=build/drivers/core/c_driver_adapter' \
+            --adapter 'rust=edge/target/release/rust_driver_adapter' \
+            --source python=../alpha-financial-pipeline \
+            --source c=. --source rust=. \
+            --output-dir build/mvp2-smoke
+          python -c 'import json; d=json.load(open("build/mvp2-smoke/smoke.json")); assert len(d["cells"]) == 18'
       - name: Stop shared services
         if: always()
         run: docker compose down --volumes

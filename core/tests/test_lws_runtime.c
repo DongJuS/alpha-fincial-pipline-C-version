@@ -2,6 +2,7 @@
 #include "unity.h"
 
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 typedef struct {
@@ -58,6 +59,8 @@ static void test_foreign_fd_read_write_timer_bounds_and_ownership(void) {
     TEST_ASSERT_EQUAL_INT(1, capture.readable);
 
     TEST_ASSERT_EQUAL_INT(ALPHA_OK, alpha_lws_watch_set_timer(capture.watch, 1));
+    const struct timespec timer_delay = {.tv_sec = 0, .tv_nsec = 2 * 1000 * 1000};
+    TEST_ASSERT_EQUAL_INT(0, nanosleep(&timer_delay, NULL));
     for (int i = 0; i < 20 && capture.timed_out == 0; ++i) {
         TEST_ASSERT_EQUAL_INT(ALPHA_OK, alpha_lws_runtime_service(runtime, 10));
     }
