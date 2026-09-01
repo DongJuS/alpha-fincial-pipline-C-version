@@ -1,0 +1,188 @@
+name: MVP-2 authoritative driver benchmark
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mvp2-authoritative-alpha-bench
+  cancel-in-progress: false
+
+env:
+  PYTHON_REFERENCE_SHA: 3642cdc0e4026424ca9b6158125551eee1d42683
+  PYTHONDONTWRITEBYTECODE: "1"
+  EVIDENCE_DIR: build/mvp2-authoritative
+
+jobs:
+  controlled-matrix:
+    name: Single-host Python C Rust matrix
+    runs-on: [self-hosted, linux, x64, alpha-bench]
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          clean: true
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11.15"
+
+      - name: Initialize evidence and pinned Python reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR/results"
+          python_reference="$RUNNER_TEMP/alpha-financial-pipeline-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          git clone --no-checkout https://github.com/DongJuS/alpha-financial-pipeline.git "$python_reference"
+          git -C "$python_reference" checkout --detach "$PYTHON_REFERENCE_SHA"
+          echo "PYTHON_REFERENCE=$python_reference" >> "$GITHUB_ENV"
+          test -z "$(git status --porcelain)"
+          test -z "$(git -C "$python_reference" status --porcelain)"
+
+      - name: Verify provisioned benchmark dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v cmake
+          command -v clang
+          command -v docker
+          command -v pkg-config
+          command -v rustc
+          command -v cargo
+          pkg-config --exists libpq hiredis libcurl
+          docker compose version
+          python -m pip install 'asyncpg==0.31.0' 'redis==5.3.1'
+
+      - name: Build pinned libwebsockets and start shared services
+        shell: bash
+        run: |
+          set -euo pipefail
+          tools/build_pinned_libwebsockets.sh
+          lws_pkgconfig="$PWD/build/deps/libwebsockets/install/lib/pkgconfig"
+          if [ -d "$PWD/build/deps/libwebsockets/install/lib64/pkgconfig" ]; then
+            lws_pkgconfig="$PWD/build/deps/libwebsockets/install/lib64/pkgconfig"
+          fi
+          echo "PKG_CONFIG_PATH=$lws_pkgconfig:${PKG_CONFIG_PATH:-}" >> "$GITHUB_ENV"
+          docker compose up -d --wait
+          python tools/verify_services.py
+
+      - name: Apply and verify pinned schema
+        env:
+          ALPHA_RUN_SCHEMA_APPLY: "1"
+        run: python -m unittest tests.test_schema_apply -v
+
+      - name: Build optimized C drivers
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --preset bench -DALPHA_WITH_DRIVERS=ON -DALPHA_ENABLE_MVP2_INTEGRATION=ON
+          cmake --build --preset bench --parallel
+          python tools/verify_build_flags.py bench build/bench/compile_commands.json
+          test -x build/bench/core/c_driver_adapter
+
+      - name: Test exact optimized C artifact against shared services
+        env:
+          ALPHA_RUN_REDIS_INTEGRATION: "1"
+          ALPHA_RUN_POSTGRES_INTEGRATION: "1"
+          ALPHA_RUN_LWS_DRIVER_INTEGRATION: "1"
+        run: >-
+          ctest --preset bench
+          -R 'redis_cache|postgres|http_client|lws_runtime|lws_drivers|c_driver_adapter'
+          --output-on-failure
+
+      - name: Build and test exact Rust release adapter
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --manifest-path edge/Cargo.toml --package alpha-driver-bench --release --locked
+          cargo build --manifest-path edge/Cargo.toml --package alpha-driver-bench --release --locked
+          test -x edge/target/release/rust_driver_adapter
+
+      - name: Capture required pre-run environment
+        run: >-
+          python bench/collect_mvp2_environment.py
+          --phase before
+          --source c=.
+          --source rust=.
+          --source python="$PYTHON_REFERENCE"
+          --output "$EVIDENCE_DIR/environment-before.json"
+
+      - name: Verify real-service parity smoke with exact artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python bench/run_driver_mvp2.py --smoke --trials 1 \
+            --adapter 'python=python bench/adapters/python_driver.py' \
+            --adapter 'c=build/bench/core/c_driver_adapter' \
+            --adapter 'rust=edge/target/release/rust_driver_adapter' \
+            --source "python=$PYTHON_REFERENCE" \
+            --source c=. --source rust=. \
+            --output-dir "$EVIDENCE_DIR/smoke"
+
+      - name: Run controlled order-rotated 30-trial matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python bench/run_driver_mvp2.py --trials 30 \
+            --adapter 'python=python bench/adapters/python_driver.py' \
+            --adapter 'c=build/bench/core/c_driver_adapter' \
+            --adapter 'rust=edge/target/release/rust_driver_adapter' \
+            --source "python=$PYTHON_REFERENCE" \
+            --source c=. --source rust=. \
+            --output-dir "$EVIDENCE_DIR/results"
+          test "$(find "$EVIDENCE_DIR/results" -name '*.json' -type f | wc -l)" -eq 18
+
+      - name: Evaluate C and Rust stop gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          result_args=()
+          while IFS= read -r -d '' result; do
+            result_args+=(--result "$result")
+          done < <(find "$EVIDENCE_DIR/results" -name '*.json' -type f -print0 | sort -z)
+          test "${#result_args[@]}" -eq 36
+          python bench/evaluate_mvp2.py "${result_args[@]}" --candidate c \
+            --output "$EVIDENCE_DIR/c-gate.json"
+          python bench/evaluate_mvp2.py "${result_args[@]}" --candidate rust \
+            --output "$EVIDENCE_DIR/rust-gate.json"
+
+      - name: Capture required post-run environment
+        run: >-
+          python bench/collect_mvp2_environment.py
+          --phase after
+          --source c=.
+          --source rust=.
+          --source python="$PYTHON_REFERENCE"
+          --output "$EVIDENCE_DIR/environment-after.json"
+
+      - name: Preserve service diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          docker compose ps --all > "$EVIDENCE_DIR/compose-ps.txt" 2>&1 || true
+          docker compose logs --no-color > "$EVIDENCE_DIR/compose.log" 2>&1 || true
+
+      - name: Tear down isolated shared services
+        if: always()
+        run: docker compose down --volumes
+
+      - name: Generate evidence checksums
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          cd "$EVIDENCE_DIR"
+          find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 -r sha256sum > SHA256SUMS
+
+      - name: Upload immutable benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mvp2-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/mvp2-authoritative
+          if-no-files-found: error
+          retention-days: 90
