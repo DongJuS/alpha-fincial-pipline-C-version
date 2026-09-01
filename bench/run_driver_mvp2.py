@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import platform
 import shlex
 import shutil
@@ -25,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONCURRENCIES = (1, 8, 32)
 CASES = ("redis-hot-path", "db-read-write")
 EVENT_LOOPS = {"python": "asyncio", "c": "lws", "rust": "tokio"}
+MIN_MEASURED_TRIAL_MS = 1000.0
 
 
 def canonical(value: object) -> bytes:
@@ -33,6 +35,49 @@ def canonical(value: object) -> bytes:
 
 def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def positive_number(value: object) -> bool:
+    """JSON number check which deliberately rejects bool (a subclass of int)."""
+    return type(value) in (int, float) and math.isfinite(value) and value > 0
+
+
+def positive_int(value: object) -> bool:
+    return type(value) is int and value > 0
+
+
+def exact_value(actual: object, expected: object) -> bool:
+    """Compare scalar JSON values without allowing True == 1 coercion."""
+    return type(actual) is type(expected) and actual == expected
+
+
+def host_environment() -> dict[str, object]:
+    cpu_model = platform.processor().strip()
+    cpuinfo = Path("/proc/cpuinfo")
+    if not cpu_model and cpuinfo.is_file():
+        for line in cpuinfo.read_text(encoding="utf-8", errors="replace").splitlines():
+            if line.lower().startswith(("model name", "hardware")) and ":" in line:
+                cpu_model = line.split(":", 1)[1].strip()
+                break
+    logical_cpus = os.cpu_count()
+    page_size = os.sysconf("SC_PAGE_SIZE") if hasattr(os, "sysconf") else None
+    page_count = os.sysconf("SC_PHYS_PAGES") if hasattr(os, "sysconf") else None
+    ram_bytes = page_size * page_count if positive_int(page_size) and positive_int(page_count) else None
+    return {
+        "host_id": platform.node(),
+        "system": platform.system(),
+        "kernel_release": platform.release(),
+        "kernel_version": platform.version(),
+        "machine": platform.machine(),
+        "cpu_model": cpu_model or "unknown",
+        "logical_cpu_count": logical_cpus,
+        "ram_bytes": ram_bytes,
+        "python_runtime": platform.python_version(),
+        "runner_name": os.getenv("RUNNER_NAME", "local"),
+        "runner_os": os.getenv("RUNNER_OS", platform.system()),
+        "runner_arch": os.getenv("RUNNER_ARCH", platform.machine()),
+        "runner_image": os.getenv("ImageOS", "unreported"),
+    }
 
 
 def percentile(values: list[float], q: float) -> float:
@@ -95,6 +140,18 @@ def adapter_attestation(command: str) -> dict[str, str]:
             "artifact": str(artifact.relative_to(ROOT)) if artifact.is_relative_to(ROOT) else artifact.name}
 
 
+def verify_post_run_attestation(
+    adapters: dict[str, str], source_paths: dict[str, str],
+    sources: dict[str, str], attestations: dict[str, dict[str, str]],
+) -> None:
+    post_sources = {variant: inspect_source(path) for variant, path in source_paths.items()}
+    post_attestations = {variant: adapter_attestation(command) for variant, command in adapters.items()}
+    if post_sources != sources:
+        raise ValueError("source changed during benchmark")
+    if post_attestations != attestations:
+        raise ValueError("adapter artifact or command changed during benchmark")
+
+
 def run_adapter(command: str, fixture: Path, case: str, concurrency: int, trial: int, namespace: str) -> dict:
     argv = shlex.split(command) + [
         "--fixture", str(fixture), "--case", case,
@@ -115,17 +172,13 @@ def run_adapter(command: str, fixture: Path, case: str, concurrency: int, trial:
     }
     if not isinstance(value, dict) or not required <= value.keys():
         raise ValueError(f"adapter output missing fields: {sorted(required - set(value))}")
-    if not isinstance(value["elapsed_ms"], (int, float)) or value["elapsed_ms"] <= 0:
-        raise ValueError("elapsed_ms must be finite and positive")
-    if not math.isfinite(float(value["elapsed_ms"])):
+    if not positive_number(value["elapsed_ms"]):
         raise ValueError("elapsed_ms must be finite and positive")
     resources = value["resources"]
     if (
         not isinstance(resources, dict)
-        or not isinstance(resources.get("peak_rss_bytes"), int)
-        or resources["peak_rss_bytes"] <= 0
-        or not isinstance(resources.get("cpu_time_ms"), (int, float))
-        or resources["cpu_time_ms"] <= 0
+        or not positive_int(resources.get("peak_rss_bytes"))
+        or not positive_number(resources.get("cpu_time_ms"))
     ):
         raise ValueError("positive peak_rss_bytes and cpu_time_ms are required")
     return value
@@ -134,7 +187,7 @@ def run_adapter(command: str, fixture: Path, case: str, concurrency: int, trial:
 def execute(
     fixture: Path, adapters: dict[str, str], sources: dict[str, str], trials: int,
     attestations: dict[str, dict[str, str]] | None = None,
-    *, minimum_trials: int = 30,
+    *, minimum_trials: int = 30, minimum_elapsed_ms: float = 0.0,
 ) -> list[dict]:
     if trials < minimum_trials:
         raise ValueError(f"MVP-2 requires at least {minimum_trials} trials")
@@ -152,6 +205,8 @@ def execute(
     if sha256_file(schema_lock) != contract["schema_sha256"]:
         raise ValueError("fixture schema checksum mismatch")
     attestations = attestations or {variant: {"command_sha256": "test", "artifact_sha256": "test", "artifact": "test"} for variant in variants}
+    environment = host_environment()
+    invariant_by_cell: dict[tuple[str, int, str], bytes] = {}
     records: list[dict] = []
     for case in CASES:
         case_config = fixture_data["cases"][case]
@@ -166,13 +221,18 @@ def execute(
                 for order_index, variant in enumerate(order):
                     namespace = f"mvp2-{case}-c{concurrency}-t{trial}"
                     out = run_adapter(adapters[variant], fixture, case, concurrency, trial, namespace)
+                    if float(out["elapsed_ms"]) < minimum_elapsed_ms:
+                        raise ValueError(
+                            f"{variant}: measured trial {out['elapsed_ms']}ms is below "
+                            f"the {minimum_elapsed_ms}ms timer-noise floor"
+                        )
                     if out["fixture_sha256"] != fixture_sha:
                         raise ValueError(f"{variant}: fixture checksum mismatch")
                     if out["completed_tokens"] != expected_tokens:
                         raise ValueError(f"{variant}: completion tokens differ or are out of order")
                     latencies = out["operation_latency_ns"]
                     if (not isinstance(latencies, list) or len(latencies) != len(expected_tokens) or
-                            any(not isinstance(value, int) or value <= 0 for value in latencies)):
+                            any(not positive_int(value) for value in latencies)):
                         raise ValueError(f"{variant}: operation latency samples are invalid")
                     if out["terminal"] != case_config["terminal"]:
                         raise ValueError(f"{variant}: terminal payload differs from committed golden")
@@ -180,6 +240,8 @@ def execute(
                         raise ValueError(f"{variant}: terminal checksum differs from committed golden")
                     if hashlib.sha256(canonical(out["terminal"])).hexdigest() != out["result_sha256"]:
                         raise ValueError(f"{variant}: terminal payload/checksum mismatch")
+                    if type(out["errors"]) is not int or type(out["dropped"]) is not int:
+                        raise ValueError(f"{variant}: errors/drops must be exact integers")
                     if out["errors"] != 0 or out["dropped"] != 0:
                         raise ValueError(f"{variant}: errors/drops make the trial ineligible")
                     config = out["configuration"]
@@ -197,22 +259,30 @@ def execute(
                         "schema_sha256": contract["schema_sha256"],
                     }
                     if not isinstance(config, dict) or any(
-                        config.get(key) != value for key, value in expected_config.items()
+                        not exact_value(config.get(key), value) for key, value in expected_config.items()
                     ):
                         raise ValueError(f"{variant}: workload configuration mismatch")
                     if config.get("event_loop_mode") != EVENT_LOOPS[variant]:
                         raise ValueError(f"{variant}: event_loop_mode mismatch")
                     build = out["build"]
-                    if (not isinstance(build, dict) or not all(build.get(key) for key in ("runtime", "compiler", "flags")) or
+                    if (not isinstance(build, dict) or
+                            any(type(build.get(key)) is not str or not build[key]
+                                for key in ("runtime", "compiler", "flags")) or
                             not isinstance(build.get("dependencies"), dict) or not build["dependencies"] or
                             any(not isinstance(value, str) or not value for value in build["dependencies"].values())):
                         raise ValueError(f"{variant}: incomplete build/dependency metadata")
+                    invariant = canonical({"configuration": config, "build": build})
+                    cell = (case, concurrency, variant)
+                    if cell in invariant_by_cell and invariant_by_cell[cell] != invariant:
+                        raise ValueError(f"{variant}: build/configuration drift within {case}/c{concurrency}")
+                    invariant_by_cell[cell] = invariant
                     if variant == "python":
                         baseline_hash = out["result_sha256"]
                     records.append({
                         "case": case, "concurrency": concurrency, "trial": trial,
                         "order_index": order_index, "variant": variant, "adapter": out,
                         "attestation": attestations[variant],
+                        "environment": environment,
                     })
                 if baseline_hash is None:
                     raise AssertionError("Python baseline did not run")
@@ -248,7 +318,7 @@ def build_results(records: list[dict], fixture: Path, sources: dict[str, str]) -
                 "result_sha256": group[0]["adapter"]["result_sha256"],
             },
             "source": {"commit": commit, "dirty": False, "adapter": group[0]["attestation"]},
-            "environment": {"host_id": platform.node(), "cpu": platform.machine(), "os": platform.platform()},
+            "environment": group[0]["environment"],
             "build": group[0]["adapter"]["build"],
             "workload": {
                 "fixture_sha256": fixture_sha, "concurrency": concurrency,
@@ -292,7 +362,9 @@ def main() -> int:
     records = execute(
         args.fixture, adapters, sources, args.trials, attestations,
         minimum_trials=1 if args.smoke else 30,
+        minimum_elapsed_ms=0.0 if args.smoke else MIN_MEASURED_TRIAL_MS,
     )
+    verify_post_run_attestation(adapters, source_paths, sources, attestations)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     if args.smoke:
         evidence = {
