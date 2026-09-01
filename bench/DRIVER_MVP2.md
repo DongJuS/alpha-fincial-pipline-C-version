@@ -31,7 +31,7 @@ object:
   "dropped": 0,
   "configuration": {
     "concurrency": 8,
-    "operation_count": 3000,
+    "operation_count": 21000,
     "pipeline_depth": 1,
     "timeout_ms": 5000,
     "event_loop_mode": "asyncio|lws|tokio",
@@ -56,6 +56,14 @@ error/drop, adapter-artifact attestation, and source-cleanliness failures. It
 emits 18 files: two cases ×
 three concurrencies × three variants, each with 30 raw order-rotated latency and
 derived operation-throughput samples.
+The committed v2 fixture uses fixed case-specific counts: 21,000 Redis
+operations and 12,000 PostgreSQL operations. Each count is identical across
+languages and was sized from the local 3,000-operation pilot to clear one second
+without exceeding the adapters' five-second trial timeout. The orchestrator still
+rejects any measured trial below 1,000 ms rather than assuming the fixture is
+long enough on a faster host. It also records kernel, CPU model/count, RAM and
+runner identity, rejects per-cell build/configuration drift, and re-attests all
+sources and adapter artifacts after the matrix.
 `evaluate_mvp2.py` uses deterministic paired bootstrap resampling and returns
 `GO` only when every cell's 95% speedup interval is above 1.0 and candidate
 CPU/RSS ratios stay within the supplied limits (default: no regression).
