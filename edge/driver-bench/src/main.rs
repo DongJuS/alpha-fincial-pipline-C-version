@@ -414,7 +414,7 @@ async fn db_case(
     let elapsed = started.elapsed().as_nanos();
     let cpu_ns = linux_cpu_ns()?.saturating_sub(cpu_before);
     let rows: Vec<(String, i64, i64)> = sqlx::query_as(
-        "SELECT strategy_id,quantity,current_price FROM portfolio_positions \
+        "SELECT strategy_id,quantity::bigint,current_price::bigint FROM portfolio_positions \
          WHERE ticker=$1 ORDER BY strategy_id",
     )
     .bind(&ticker)
