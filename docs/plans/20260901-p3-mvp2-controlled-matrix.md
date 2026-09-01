@@ -32,3 +32,10 @@ gate without advancing P4/P5 unless the required decision permits it.
 - Update `progress.md` and durable decisions in `MEMORY.md`, merge to `main`,
   push, and verify hosted main CI. A failed criterion records NO-GO; it is never
   rewritten as missing work or used to bypass the MVP-2 stop gate.
+
+## Current result
+
+Implementation and the enlarged 18-cell real-service smoke are green in hosted
+CI `33461113374`. No repository runner currently has the required
+`self-hosted,linux,x64,alpha-bench` labels, so the authoritative job cannot be
+dispatched. The matrix, result import, and stop-gate decision remain pending.
