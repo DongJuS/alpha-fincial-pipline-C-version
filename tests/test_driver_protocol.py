@@ -41,7 +41,7 @@ class DriverProtocolTest(unittest.TestCase):
     def test_fixture_has_fixed_duration_sized_operation_trials(self):
         fixture = json.loads(FIXTURE.read_bytes())
         self.assertEqual(21000, fixture["cases"]["redis-hot-path"]["repeat"] * 3)
-        self.assertEqual(12000, fixture["cases"]["db-read-write"]["repeat"] * 3)
+        self.assertEqual(9000, fixture["cases"]["db-read-write"]["repeat"] * 3)
 
     def test_environment_attestation_has_stable_required_fields(self):
         environment = run.host_environment()

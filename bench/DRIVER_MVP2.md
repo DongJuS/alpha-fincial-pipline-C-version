@@ -57,7 +57,7 @@ emits 18 files: two cases ×
 three concurrencies × three variants, each with 30 raw order-rotated latency and
 derived operation-throughput samples.
 The committed v2 fixture uses fixed case-specific counts: 21,000 Redis
-operations and 12,000 PostgreSQL operations. Each count is identical across
+operations and 9,000 PostgreSQL operations. Each count is identical across
 languages and was sized from the local 3,000-operation pilot to clear one second
 without exceeding the adapters' five-second trial timeout. The orchestrator still
 rejects any measured trial below 1,000 ms rather than assuming the fixture is
