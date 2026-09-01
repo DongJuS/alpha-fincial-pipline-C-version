@@ -4,6 +4,7 @@
 # Build outputs
 /build/
 /target/
+/edge/target/
 
 # Tooling caches
 .cache/

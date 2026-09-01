@@ -134,6 +134,7 @@ if(ALPHA_WITH_DRIVERS)
     pkg_check_modules(HIREDIS REQUIRED hiredis)
     pkg_check_modules(LIBPQ REQUIRED libpq)
     pkg_check_modules(LIBCURL REQUIRED libcurl)
+    find_package(OpenSSL REQUIRED)
     if(NOT DEFINED ALPHA_LWS_PREFIX)
         set(ALPHA_LWS_PREFIX "${PROJECT_SOURCE_DIR}/build/deps/libwebsockets/install")
     endif()
@@ -208,9 +209,28 @@ if(ALPHA_WITH_DRIVERS)
     target_compile_options(test_lws_drivers PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
     add_test(NAME lws_drivers COMMAND test_lws_drivers)
 
+    add_executable(c_driver_adapter apps/c_driver_adapter.c)
+    target_link_libraries(c_driver_adapter PRIVATE alpha_lws_runtime alpha_cache alpha_postgres
+                                                   yyjson OpenSSL::Crypto)
+    target_compile_options(c_driver_adapter PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
+    target_compile_definitions(c_driver_adapter PRIVATE _DEFAULT_SOURCE)
+
+    option(ALPHA_ENABLE_MVP2_INTEGRATION "Run real MVP-2 C adapter smoke tests" OFF)
+    if(ALPHA_ENABLE_MVP2_INTEGRATION)
+        foreach(case redis-hot-path db-read-write)
+            add_test(
+                NAME c_driver_adapter_${case}
+                COMMAND c_driver_adapter --fixture
+                        ${PROJECT_SOURCE_DIR}/bench/fixtures/driver-workloads.json --case ${case}
+                        --concurrency 1 --trial 0 --namespace cmake-smoke-${case})
+            set_tests_properties(c_driver_adapter_${case} PROPERTIES PASS_REGULAR_EXPRESSION
+                                                                        "completed_tokens")
+        endforeach()
+    endif()
+
     if(ALPHA_ENABLE_SANITIZERS)
         foreach(target alpha_postgres test_postgres alpha_http test_http_client alpha_lws_runtime
-                       test_lws_runtime test_lws_drivers)
+                       test_lws_runtime test_lws_drivers c_driver_adapter)
             target_compile_options(${target} PRIVATE -fsanitize=address,undefined
                                    -fno-omit-frame-pointer)
             target_link_options(${target} PRIVATE -fsanitize=address,undefined)
