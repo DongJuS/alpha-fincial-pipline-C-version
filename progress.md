@@ -2,14 +2,15 @@
 
 > Update this after every task. Keep under ~200 lines. Record *why*, not just *what*.
 
-## Status: Phase 2 complete — parity-gated C decision core
+## Status: Phase 3 in progress — MVP-2 controlled matrix pending
 
 P0 contracts and P1 numeric core are closed. P2 ports the full deterministic
 decision layer — market_data normalization, N-way/2-way blending, the risk gates
 (L1 stop/take, L2 drawdown weakest-two, L3 daily breaker), max-position sizing,
 and the screener filter — each golden-gated against the pinned Python source
 under both `dev` (ASan) and `bench` (`-O3`) presets, with blend and risk batch
-benchmarks. Next is P3 nonblocking drivers, up to the MVP-2 GO/NO-GO gate.
+benchmarks. P3 drivers and all three real adapters pass hosted parity smoke; the
+controlled 30-trial matrix and MVP-2 decision remain unfinished.
 
 ## Reference baseline (must be completed in P0)
 
@@ -33,7 +34,7 @@ benchmarks. Next is P3 nonblocking drivers, up to the MVP-2 GO/NO-GO gate.
 | P0 | Pin Python baseline + harness + C scaffold | ✅ done (hosted CI green) |
 | P1 | C numeric slice + first Python/C benchmark | ✅ done (parity dev+bench, ~179× bench) |
 | P2 | C decision core + parity/performance | ✅ done (decisions+risk+screener; blend/risk benchmarks) |
-| P3 | C drivers against shared infrastructure | 🟨 in progress (driver/LWS tests green; C/Rust benchmark adapters pending) |
+| P3 | C drivers against shared infrastructure | 🟨 in progress (18-cell smoke green; 30-trial gate pending) |
 | P4 | Pure-C edges + Rust datalake + optional Rust network comparisons | ⬜ not started |
 | P5 | E2E + consolidated comparison report | ⬜ not started |
 
@@ -70,6 +71,11 @@ live shadowing or order activation is not authorized by this project.
 
 ## Documentation completed
 
+- 2026-09-01: **MVP-2 native adapter smoke.** Real Python, C (pinned LWS/libpq/
+  hiredis), and Rust (Tokio/SQLx/fred) emit 3,000 completion/latency samples,
+  namespaced state, terminal goldens, and strict attestations at truthful depth 1.
+  Hosted Linux CI `33459011368` passed all 18 real-service smoke cells. This is
+  parity/readiness evidence only; no benchmark decision is recorded.
 - 2026-08-31: **P3 driver recovery + production LWS runtime.** Corrected the
   Python `hard_stop:lockout:{scope}` key and absolute `EXAT` validation; added
   bounded typed hiredis async reconnect, bounded curl-multi failure/cancellation
@@ -183,13 +189,8 @@ live shadowing or order activation is not authorized by this project.
 
 ## Next action
 
-P0 contracts are closed (pinned Rust datalake workspace, source-pinned
-libwebsockets, locked migrations) and P2 is complete (market_data, blending,
-risk gates, sizing, screener — all parity-gated; blend + risk batch benchmarks).
-Enter **P3 (C nonblocking drivers)**: `platform/db` (nonblocking libpq, bounded
-pipeline), `platform/cache` (hiredis async), required libcurl-multi HTTP, all on
-the libwebsockets-owned loop, against the shared Docker Postgres/Redis. This is
-the run-up to the **MVP-2 driver-I/O GO/NO-GO** gate (`docs/plans/phase-3-drivers.md`).
+Run the controlled 30-trial matrix on one pinned Linux host, commit all 18 result
+files, and evaluate C/Rust. Keep P4/P5 stopped until the evidence-based gate.
 
 ## 2026-08-31 — P2 risk benchmark
 - Added identical 100,000-snapshot Python/C risk workloads covering stop/take,

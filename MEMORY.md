@@ -129,6 +129,12 @@
   lockout. `latest_ticks:{ticker}` (TTL 60) keeps exact Python key parity.
 - Synchronous hiredis remains only for focused correctness tests. Timed work must
   use the bounded typed hiredis async path on the pinned LWS runtime.
+- MVP-2 reports pipeline/queue depth 1 because all three single-connection
+  adapters execute serial commands. Every eligible run requires a trial
+  namespace, 3,000 ordered completion/latency samples, committed terminal
+  equality, artifact/source attestation, and service/schema/dependency hashes.
+  The hosted 18-cell smoke proves parity only; only the committed 30-trial matrix
+  may decide GO/NO-GO.
 
 ## Toolchain / lint
 - Project `.clang-tidy` disables four checks project-wide with rationale:
